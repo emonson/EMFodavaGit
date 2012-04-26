@@ -1,0 +1,54 @@
+%% Method 1 -- grabbing all wavelet coefficients for a given data index
+
+pt_idx = 2000;
+leaf_node = gW.IniLabels(pt_idx);
+imap(gW.LeafNodes) = 1:length(gW.LeafNodes);
+
+wav_coeffs_mat = [Data.CelWavCoeffs{imap(leaf_node),:}];
+wav_coeffs_vec = wav_coeffs_mat((gW.PointsInNet{leaf_node} == pt_idx),:);
+
+%% Method 2 -- also builds a list (cell array) of the coeffs at each scale
+
+pt_idx = 2000;
+leaf_node = gW.IniLabels(pt_idx);
+pt_row = find(gW.PointsInNet{leaf_node} == pt_idx);
+imap(gW.LeafNodes) = 1:length(gW.LeafNodes);
+leaf_idx = imap(leaf_node);
+
+scales = size(Data.CelWavCoeffs,2);
+wav_coeffs = cell(1,scales);
+
+for ii = 1:scales,
+    if(~isempty(Data.CelWavCoeffs{leaf_idx,ii}))
+        wav_coeffs{ii} = Data.CelWavCoeffs{leaf_idx,ii}(pt_row,:);
+    else
+        wav_coeffs{ii} = [];
+    end
+end
+
+wav_coeffs_vec = [wav_coeffs{:}];
+
+%% Constructing all the wavelet coeffs for a given node
+
+node_idx = 32;
+offspring = get_offspring(gW.cp, node_idx);
+offspring = [node_idx offspring];
+relevantLeafNodes = offspring(logical(gW.isaleaf(offspring)));
+imap(gW.LeafNodes) = 1:length(gW.LeafNodes);
+wav_coeffs_img = cat(1, Data.CelWavCoeffs{imap(relevantLeafNodes), gW.Scales(n)});
+
+%% Build cell array of already constructed wavelet coeffs for each node
+
+num_nodes = length(gW.cp);
+imap(gW.LeafNodes) = 1:length(gW.LeafNodes);
+wav_coeff_imgs = cell(1,num_nodes);
+
+for node_idx = 1:num_nodes,
+    offspring = [node_idx get_offspring(gW.cp, node_idx)];
+    % offspring = [node_idx offspring];
+    relevantLeafNodes = offspring(logical(gW.isaleaf(offspring)));
+    wav_coeff_imgs{node_idx} = cat(1, Data.CelWavCoeffs{imap(relevantLeafNodes), gW.Scales(node_idx)});
+end
+
+%% Rotating MNIST digits for GUI
+

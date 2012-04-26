@@ -1,0 +1,85 @@
+function [outArray,outCorrect] = propagateLabels2(Idxs, Cats, P, numSteps, N, M)
+% [outArray,outCorrect] = propagateLabels(Idxs, Cats, P, numSteps)
+%
+% Propagate labels and return "correct" rate over time
+% This version changes from "remove 1" to remove N with M replicates
+%
+% EMonson -- 13 Aug 2009
+
+numIdxs = length(Idxs);
+numCats = length(unique(Cats));
+numPts = size(P,1);
+
+% Each (numPts x numCats) array leaves out one labeled point for testing
+labelBlock = zeros(numPts, numCats, M);
+labelArray = zeros(numPts, numCats);
+lastArray = zeros(numPts, numCats);
+outArray = zeros(numPts, numCats);
+leaveOuts = zeros(N,M);
+
+outCorrect = 0;
+lastCorrect = 0;
+
+% Pick "leave out" indexes from Idxs list (labeled points)
+for jj = 1:M,
+    randPicks = randperm(numIdxs);
+    leaveOuts(:,jj) = randPicks(1:N);
+end;
+
+% matlabpool('open',8);
+for tt = 1:numSteps,
+    
+    % Fill ones in labeled spots as "sources" for propagation
+    %   leaving one out for each array for testing
+    for kk = 1:M,
+        for ii = setdiff(1:numIdxs,leaveOuts(:,kk));     % leave some out
+            labelBlock(Idxs(ii),Cats(ii),kk) = 1.0;
+            % labelBlock(Idxs(ii),setdiff(1:numCats,Cats(ii)),kk) = -1.0;
+        end;
+    end;
+    % Fill known points with ones (no leaving out)
+    for ii = 1:numIdxs,
+        labelArray(Idxs(ii),Cats(ii)) = 1.0;
+        % labelArray(Idxs(ii),setdiff(1:numCats,Cats(ii))) = -1.0;
+    end;
+    
+    % Propagate labels one step
+    labelArray = P*labelArray;
+
+    % parfor ss = 1:M,
+    for ss = 1:M,
+        labelBlock(:,:,ss) = P*labelBlock(:,:,ss);
+    end;
+   
+    % "Correctness" check
+    correctArray = zeros(N,M);
+    allZeros = 0;
+    ltZeros = 0;
+    for ee = 1:M,
+        % Indexes leaveOuts(:,ee) left out of Idxs label/source
+        % max() gives largest label value = assigned category
+        [Y,I] = max(labelBlock(Idxs(leaveOuts(:,ee)),:,ee),[],2);
+        correctArray(:,ee) = double(I == Cats(leaveOuts(:,ee))');
+        allZeros = allZeros + sum(Y==0);
+        ltZeros = ltZeros + sum(Y<0);
+    end;
+    fprintf(1,'Num all 0 tests = %d || any allZeroOther %d || ', allZeros, any(sum(lastArray,2)<1e-20));
+    correctAvg = mean(mean(correctArray,1),2);  % mean over leaveOuts 1st
+    correctStd = std(mean(correctArray,1),0,2);  % mean over leaveOuts 1st
+    fprintf(1,'Correct frac/std = %6.5f/%6.5f\n', correctAvg, correctStd);
+
+    
+    % Quit if further propagation only makes things worse (on average)
+    % but keep going if any nodes have all zeros
+%    if (correctAvg <= lastCorrect && ~any(sum(lastArray,2)<1e-20)), 
+    if (correctAvg <= lastCorrect), 
+        outArray = lastArray;
+        outCorrect = lastCorrect;
+        break;         
+    end;
+    
+    lastCorrect = correctAvg;
+    lastArray = labelArray;
+end;
+% matlabpool('close');
+end

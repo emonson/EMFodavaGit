@@ -1,0 +1,172 @@
+% Using hierarchical clustering on results of random label propagation to
+% create a new tdm and document graph
+% EMonson -- 14 Dec 2009
+
+clear all;
+data_dir = '/Users/emonson/Data/Fodava/EMoDocMatlabData';
+% data_name = 'n20_set2train_TFcorr_121009.mat';
+data_name = 'SN_emo1nvj_TFcorr_112509.mat';
+save_dir = data_dir;
+save_name = 'SN_emo1nvj_TermFilt_TFcorr_121409.mat';
+
+cd(data_dir);
+fprintf(1,'Reading original data file\n');
+load(data_name);
+
+scale = 4;
+dups = 3;
+uncertThresh = 0.6;
+
+overlap = true;
+numReplicates = 30; % Not used if overlap=false
+
+leaveOutFracOfTotal = false;    
+numLeaveOut = 3;   % Not used if leaveOutFracOfTotal = true;
+leaveOutFrac = 0.2;
+
+fprintf(1,'Choosing random points (%d dups) -- ', dups);
+[randIdxs,randCats] = docChooseRandomPoints(classes(:,1),'duplicates',dups);
+fprintf(1,'%d chosen\n', length(randIdxs));
+
+fprintf(1,'Propagating random labels\n');
+randLabelArray = propagateLabels(randIdxs,randCats,G.P,20);
+[junk,randCatOut] = max(randLabelArray,[],2);
+fprintf(1,'Number all zero propagated results: %d\n', length(find(junk==0.0)) );
+randCorrect = (randCatOut == classes(:,1));
+randCorrect(sum(randLabelArray,2)<1e-20) = 0;
+fprintf(1,'random correct: %d / %d (%4.3f)\n\n', sum(randCorrect), length(randCorrect), sum(randCorrect)/length(randCorrect));
+
+% Calculating entropy uncertainty on labeled points
+normRLabels = randLabelArray./repmat(sum(randLabelArray,2),[1 size(randLabelArray,2)]); 
+tmpRLog = log10(normRLabels);
+% TODO: check if this is putting bad points below uncertainty threshold...
+tmpRLog(isinf(tmpRLog)) = 0;
+uncertaintyR = sum( -1.*normRLabels.*tmpRLog ,2);
+
+% Plot uncertainty values with labeled points and uncertainty histogram
+figure; plot(normRLabels); hold on; plot(uncertaintyR,'k.');
+figure; hist(uncertaintyR,100);
+drawnow;
+
+fprintf(1,'Number docs passing uncertainty threshold = %d\n', ...
+        sum((uncertaintyR > uncertThresh) & (sum(normRLabels,2)>1e-20)));
+
+threshNormRLabels = normRLabels;
+% "unlabel" points above uncertainty threshold
+threshNormRLabels(uncertaintyR>uncertThresh,:) = 0;
+
+% CHOICE: Using un-normalized tdm for now...
+tcm = tdm*threshNormRLabels;
+% CHOICE: Normalizing resulting "term-color matrix"
+tcmN = tcm./repmat(sum(tcm,2),[1 size(threshNormRLabels,2)]);
+tcmN(isnan(tcmN))=0;
+colorUncert = mat_entropy(tcmN,2);
+
+% Doing hierarchical clustering 
+% TODO: Check on which options work best
+% NOTE: Don't really need to do this if doing uncerainty threshold in
+%       next step, except easier to see results...
+% fprintf(1,'Clustering term-color distributions\n');
+% Y = pdist(tcmN,'cityblock');
+% Z = linkage(Y,'average');
+% figure; [H,T,perm] = dendrogram(Z,0);
+% figure; plot(tcmN(perm,:)); hold on; plot(colorUncert(perm),'k.');
+% figure; hist(colorUncert,200);
+
+% ======
+% Calculate new tdm and MS graph with new term list
+% ======
+
+% Set new threshold for uncertainty in term color distributions
+nextUncertThresh = 0.6;
+keepTerms = (colorUncert < nextUncertThresh) & (sum(tcmN,2)>1e-20);
+
+tdm_new = tdm(keepTerms,:);
+terms_new = terms(keepTerms);
+clear('G');
+
+corrQuantile = 0.90;    % Global cutoff for correlations
+NN = 5;                 % number of nn required in corr mtx 
+                        % -- includes one self-neighbor
+
+% calculate TF normalization for word counts
+nkj = sum(tdm_new,1)';      % how many terms in each document
+
+[ii,jj,vv] = find(tdm_new);
+vv_norm = vv./nkj(jj);
+
+tdm_new_norm = sparse(ii,jj,vv_norm);
+
+clear('ii','jj','vv','nkj','D','vv_norm');
+
+XX = mat_corr(tdm_new_norm);
+
+fprintf(1,'Calculating %f quantile of correlation values :: ',corrQuantile); toc;
+qq = quantile(XX(XX>0),corrQuantile);
+
+fprintf(1,'Filtering out low corr values :: '); toc;
+YY = sparse(XX.*(XX>qq));
+
+% Check if any rows/columns of YY are too sparse
+fprintf(1,'Adjusting neighbors :: '); toc;
+for ii = find(sum(YY>0,1) < NN),
+    % Add elements from XX back into YY to reach required NN count
+    [sC,sI] = sort(XX(:,ii),'descend');
+    YY(sI(1:NN),ii) = sC(1:NN);
+    YY(ii,sI(1:NN)) = sC(1:NN);
+end;
+
+numConnComp = graphconncomp(YY);
+fprintf(1,'Number of connected components = %d\n', numConnComp);
+
+% For now, break if graph not completely connected...
+if (numConnComp > 1)
+    break;
+end;
+
+clear('XX');
+
+G.W = YY;
+
+clear('YY');
+
+% Compute operators on the graph
+fprintf(1,'Constructing graph operators :: '); toc;
+G = ConstructGraphOperators ( G );
+
+% Compute the eigenvalues and eigenfunctions
+% fprintf(1,'Computing eigenvectors/values :: '); toc;
+% [G.EigenVecs,G.EigenVals] = eigs(G.T,min([100,size(G.W,1)]),'LM',struct('verbose',0));
+% G.EigenVals = diag(G.EigenVals);
+
+% Compute the multiscale analysis
+fprintf(1,'Performing diffusion wavelet analysis :: '); toc;
+WaveletOpts = struct('Symm',true,'Wavelets',false,'GS','gsqr_emo','GSOptions',struct('StopN',4800));
+G.Tree = DWPTree(G.T, 20, 1e-5, WaveletOpts);
+
+% figure; 
+% plot(sum(G.Tree{1,1}.ExtBasis,1));
+% hold on;
+% plot(sum(G.Tree{2,1}.ExtBasis,1),'r');
+% plot(sum(G.Tree{3,1}.ExtBasis,1),'g');
+% plot(sum(G.Tree{4,1}.ExtBasis,1),'m');
+% plot(sum(G.Tree{5,1}.ExtBasis,1),'k');
+% plot(sum(G.Tree{6,1}.ExtBasis,1),'c');
+% 
+% figure; 
+% plot(diag(G.Tree{1,1}.T{1}));
+% hold on;
+% plot(diag(G.Tree{2,1}.T{1}),'r');
+% plot(diag(G.Tree{3,1}.T{1}),'g');
+% plot(diag(G.Tree{4,1}.T{1}),'m');
+
+fprintf(1,'Saving file :: '); toc;
+cd(save_dir);
+
+% Very large datasets need new version 7.3 save format, but scipy.io can't
+% read them...
+if (size(G.T,1) > 10000)
+    save('-v7.3',save_name);
+else
+    save(save_name);
+end;

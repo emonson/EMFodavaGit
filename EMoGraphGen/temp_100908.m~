@@ -1,0 +1,47 @@
+function temp_100908(G, cOpts)
+% Plot multiple scale graphs with edge colors and cutoff
+
+FF = figure; 
+
+depth = size(G.Tree,1);
+
+if ~isfield(cOpts.Representation,'Type'),
+    cOpts.Representation.Type = 'Animation';
+end;
+if ~isfield(cOpts,'Scales'),
+    cOpts.Scales = 1:size(G.Tree,1);
+end;
+
+switch lower(cOpts.Representation.Type),
+    case {'animation'}
+        for j = 1:length(cOpts.Scales),
+%             if cOpts.Scales(j)>0,                
+%                 cOpts.GraphOpts.Fcn = lNorms{cOpts.Scales(j)};
+%             end;
+            DrawSimpleGraph( Gj{j},cOpts.GraphOpts ); hold off;
+            if cOpts.Representation.FixAxes,
+                if j==1,
+                    lXLim = get(gca,'XLim');lYLim = get(gca,'YLim');
+                else
+                    set(gca,'XLim',lXLim); set(gca,'YLim',lYLim);
+                end;
+            end;
+            if j<length(cOpts.Scales),
+%                pause;cla;
+                pause;
+            end;
+        end;
+    case {'array'}
+        lx = 4;
+        ly = 5;
+
+        for jj = cOpts.Scales, 
+            subplot(ly,lx,jj); 
+            DrawSimpleGraph2(G,struct('Level',jj,'MaxSim',0.12,'WThresh',0.005,'FigHandle',FF)); 
+        end;
+    otherwise
+        fprintf('DrawSimpleMultiscale: representation %s unknown.\n',cOpts.Representation);        
+end;
+
+
+return;

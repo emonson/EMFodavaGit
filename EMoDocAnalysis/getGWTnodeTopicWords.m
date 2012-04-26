@@ -1,0 +1,55 @@
+GWT = gW;
+leafNodes = find(leafnodes( gW.cp ));
+
+PR_NODE_IDXS = false;
+
+% BASIS = 'center';
+BASIS = 'scal';
+% BASIS = 'wav';
+
+node_idx = 12;
+vec_idx = 4;
+
+if(PR_NODE_IDXS),
+    minSc = 2;
+    maxSc = 5;
+
+    for j = minSc:maxSc,
+        nets = sort([find(gW.Scales == j) leafNodes(gW.Scales(leafNodes)<j)], 'ascend');
+        fprintf(1,'Scale %d\n', j);
+        disp(nets);
+    end
+end
+
+if(strcmp(BASIS,'center')),
+    basis_vec = gW.Centers{node_idx}+cm;
+elseif(strcmp(BASIS,'wav'))
+    basis_vecs = gW.WavBases{node_idx};
+    basis_vec = basis_vecs(:,vec_idx);
+else
+    basis_vecs = gW.ScalFuns{node_idx};
+    basis_vec = basis_vecs(:,vec_idx);
+end
+
+[ff,II] = sort(abs(basis_vec),'descend');
+gg = basis_vec(II);
+
+clipString = '';
+for ii = 1:50, 
+    % fprintf(1,'%s:%3.2f\n',cDict{II(ii)},ff(ii)*100); 
+    if(gg(ii) > 0)
+        color_str = 'CA0020';
+    else
+        color_str = '0571B0';
+    end
+    if(strcmp(BASIS,'center'))
+        color_str = '222222';
+    end
+    tmpString = sprintf('%s:%3.2f:%s\n',dict{II(ii)},abs(gg(ii).*100),color_str); 
+    clipString = sprintf('%s%s',clipString,tmpString);
+    % clipString = [clipString tmpString];
+end;
+
+% Copying results onto the clipboard for pasting into wordle advanced
+clipboard('copy',clipString);
+

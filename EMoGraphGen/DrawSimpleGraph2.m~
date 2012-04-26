@@ -1,0 +1,145 @@
+function DrawSimpleGraph2(G,cOpts)
+
+%
+% function DrawSimpleGraph2(G,cOpts)
+%
+% Plots a graph
+%
+% IN:
+%   G       : structure containing at least the field W and X
+%   cOpts   : structure of options:
+%               Level      : Level within hierarchy to plot
+%               Offset     : Negative offset of level plotted behind points
+%               FigHandle  : figure handle
+%               MarkerSize : Default: 3.
+%               WThres     : do not display edges with similarities smaller
+%                            than this threshold. Default: 0.
+%               NoiseWiggle: size of noise to add to points. Default: 0.
+%               [Edges]    : display or not edges. Default: true.
+%
+% OUT:
+%
+%
+%
+%
+
+% @Copyright 2008
+%   Mauro Maggioni
+%   Duke University
+%
+%
+
+
+if nargin<2,
+    cOpts = [];
+end;
+
+if ~isfield(cOpts,'Level'),
+    cOpts.Level = 1;
+end;
+if ~isfield(cOpts,'Offset'),
+    cOpts.Offset = 3;
+end;
+if ~isfield(cOpts,'FigHandle'),
+    cOpts.FigHandle = figure;
+end;
+if ~isfield(cOpts,'MarkerSize'),
+    cOpts.MarkerSize = 2;
+end;
+if ~isfield(cOpts,'WThres'),
+    cOpts.WThres = 0;
+end;
+if ~isfield(cOpts,'Edges'),
+    cOpts.Edges = true;
+end;
+if ~isfield(cOpts,'MaxSim'),
+    cOpts.MaxSim = 1.0;
+end;
+if ~isfield(cOpts,'NoiseWiggle'),
+    cOpts.NoiseWiggle = 0;
+end;
+
+W = G.Tree{cOpts.Level,1}.T{1};
+X = G.Tree{cOpts.Level,1}.X;
+ExtBasis = G.Tree{cOpts.Level,1}.ExtBasis;
+
+% Find edges
+% [i,j,s] = find(W);
+
+W = W.*(1-eye(size(W,1)));
+W = W.*(abs(W) > cOpts.WThresh);
+% G.W = (G.W).*(abs(G.W)<(1/cOpts.WThres)*min(s));
+
+% Find edges
+[i,j,s] = find(W);
+
+% Add a tiny bit of random noise
+if cOpts.NoiseWiggle>0,
+    X = X+cOpts.NoiseWiggle*randn(size(X));
+end;
+
+figure(cOpts.FigHandle);
+set(gcf, 'Color', 'w');
+
+sampSet = 0;
+% Draw convex hull of positive functions
+if(cOpts.Level > (cOpts.Offset+1))
+    % PosBasis = ExtBasis(:,(sum(ExtBasis,1) > 0.75));
+    PosBasis = ExtBasis.^2;    
+    % for kk = 1:size(PosBasis,2),
+    sampSet = randsample(size(PosBasis,2), ceil(size(PosBasis,2)/15));
+    for kk = sampSet',
+        funcHi = PosBasis(:,kk) > 0.01; % 0.07;
+        Xtmp = G.X(:,funcHi);
+        if(size(Xtmp,2) > 2),
+            outlinePts = convhull(Xtmp(1,:),Xtmp(2,:));
+            fill(Xtmp(1,outlinePts),Xtmp(2,outlinePts),[237 227 216]./255,'FaceAlpha',0.5);
+            if kk == sampSet(1), hold on; end;
+            plot(Xtmp(1,:),Xtmp(2,:),'+','Color',[0.0 0.5 0.25],'LineWidth',2);
+        else
+            line(Xtmp(1,:),Xtmp(2,:),'LineWidth',4,'Color',[0.0 0.3 0.1]);
+            if kk == sampSet(1), hold on; end;
+        end;
+    end;
+end;
+
+% Plot background markers
+if(cOpts.Level < (cOpts.Offset+1))
+    plot(G.X(1,:),G.X(2,:),'.','MarkerSize',6,'Color',[0.2 0.4 0.2]);
+else
+    plot(G.X(1,:),G.X(2,:),'.','MarkerSize',6,'Color',[0.2 0.4 0.2]);
+    % hold on;
+    % plot(G.Tree{cOpts.Level-cOpts.Offset,1}.X(1,:), ...
+    %       G.Tree{cOpts.Level-cOpts.Offset,1}.X(2,:), ...
+    %       'r.','MarkerSize',20,'Color',[128 108 87]./255);
+end;
+
+hold on;
+axis image;
+set(gca,'Visible','off');
+
+% Plot lines between points which are connected strongly enough
+numColors = 64;
+lineColorMap = 1-copper(numColors);
+fprintf(1,'\tLevel: %d -- Similarity (max/min): (%2.3f, %2.3f)\n', cOpts.Level, max(s), min(s));
+for kk = 1:length(i),
+    l = line( [X(1,i(kk)),X(1,j(kk))],[X(2,i(kk)),X(2,j(kk))] );            
+    set(l,'LineWidth',(5/cOpts.MaxSim)*abs(s(kk)));
+    cindex = min([fix((abs(s(kk))/cOpts.MaxSim)*numColors)+1 numColors]);
+    set(l, 'Color', lineColorMap(cindex,:));
+end;
+
+% Plot red circle markers
+% plot(X(1,:),X(2,:),'ro','LineWidth',3,'MarkerSize',6,'Color',[181 16 16]./255);
+posBasisIdxs = ExtBasis(:,(sum(ExtBasis,1) > 0.75));
+plot(X(1,:),X(2,:),'ro','LineWidth',3,'MarkerSize',6,'Color',[181 16 16]./255);
+
+% Plot purple circles for the points corresponding to the hulls
+if (length(sampSet) > 1) && (sampSet(1) > 0),
+    plot(X(1,sampSet),X(2,sampSet),'ro','LineWidth',3,'MarkerSize',6,'Color',[0.0 0.5 0.25]);
+end;
+
+text(0,0,sprintf('Scale %d', cOpts.Level));
+hold off;
+
+return;

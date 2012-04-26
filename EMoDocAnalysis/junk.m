@@ -1,0 +1,30 @@
+clear all;
+baseName = 'X20_042709b';
+
+cd('/Users/emonson/Programming/Matlab/EMonson/Fodava/DocumentAnalysis/Analysis');
+fprintf(1,'Loading data set\n');
+load([baseName '.mat'],'G','classes','pts');
+
+scale = 4;
+num = 30;       % Original number of points picked
+
+extIdxs = G.Tree{scale,1}.ExtIdxs;
+cats = classes(:,1);
+  
+% Pick points from list of multiscale indices
+% fprintf(1,'Choosing scale %d points (num: %d) -- ', scale, num);
+[pickedIdxs,pickedCats] = docChooseScalePoints(classes(:,1),extIdxs,'number',num);
+
+% Propagate points
+% fprintf(1,'Propagating scale labels\n');
+scaleLabelArray = propagateLabels(scaleIdxs,scaleCats,G.P,20);
+
+% Find which are really correct
+[junk,scaleCatOut] = max(scaleLabelArray,[],2);
+scaleCorrect = (scaleCatOut == classes(:,1));
+fprintf(1,'\nscale correct: %d / %d (%4.3f)\n', sum(scaleCorrect), length(scaleCorrect), sum(scaleCorrect)/length(scaleCorrect));
+
+labelsSorted = sort(scaleLabelArray,2,'descend');
+labelsSorted = labelsSorted./repmat(sum(labelsSorted,2),[1 size(labelsSorted,2)]);
+uncertainty = 1+diff(labelsSorted(:,1:2),1,2);
+
