@@ -2,8 +2,8 @@ function [sum_errors, std_errors, errors_array] = lda_crossvalidation( data, lab
 
 % Cross-validation (1/5 holdout for now) of Linear Discriminant Analysis
 %
-% data = [n d] array of measurements
-% labels = [n 1] array of category labels (integers)
+% data = [d n] array of measurements
+% labels = [1 n] array of category labels (integers)
 % 
 % (optional)
 % holdout_groups = 5 : number of groups for cross-validation
@@ -16,12 +16,15 @@ function [sum_errors, std_errors, errors_array] = lda_crossvalidation( data, lab
 
     function [tf] = allintarray(xx)
         tf = false;
+        % numeric
         if ~isnumeric(xx),
             return;
         end
+        % 1d array
         if size(xx,1) ~= 1,
             return;
         end
+        % integers
         for idx = 1:length(xx),
             if uint8(xx(idx)) ~= xx(idx),
                 return;
@@ -59,20 +62,21 @@ n_labels = length(cats);
 
 groups = randi(m, [n_labels 1]);
 
-errors_array = zeros(m,1);
+errors_array = zeros(m, 1);
 for rr = 1:m,
     
     % train and test 
-    meas_train = meas(groups ~= rr,:);
-    meas_test = meas(groups == rr,:);
+    meas_train = meas(:,groups ~= rr);
+    meas_test = meas(:,groups == rr);
     labels_train = cats(groups ~= rr);
     labels_test = cats(groups == rr);
     n_labels_test = length(labels_test);
     
-    W = LDA(meas_train, labels_train);
+    % LDA code wants measurements [n d] order
+    W = LDA(meas_train', labels_train');
     
     % Use the model on test set
-    L = [ones(n_labels_test,1) meas_test] * W';
+    L = [ones(n_labels_test,1) meas_test'] * W';
     % P = exp(L) ./ repmat(sum(exp(L),2),[1 size(L,2)]);
 
     [~,I] = max(L,[],2);

@@ -1,10 +1,11 @@
 % Test holdout data split for classifier accuracy measurement
 
-data_set = 'scinews';
+data_set = 'sciencenews';
 
-[data, labels] = lda_generateData(data_set, 'dim', 30);
+% [data, labels] = lda_generateData(data_set, 'dim', 30);
+[data, labels] = lda_generateData( data_set, 'dim', 50, 'digits', [0 1 2 3 4 5 6 7 8 9], 'n_ea_digit', 10000);
 
-[total_errors, std_errors] = lda_crossvalidation( data, labels, 'holdout_groups', 10 );
+[total_errors, std_errors] = lda_crossvalidation( data, labels, 'holdout_groups', 5 );
 
 %% Results summary
 

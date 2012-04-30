@@ -13,8 +13,8 @@ function [meas, labels] = lda_generateData( data_name, varargin )
 %
 % OUTPUT:
 %
-% data = [n d] array of measurements
-% labels = [n 1] array of category labels (integers)
+% meas = [d n] array of measurements
+% labels = [1 n] array of category labels (integers)
 
 % e.g. [meas, labels] = lda_generateData( 'MNIST_Digits', 'dim', 50, 'digits', [3 4 5], 'n_ea_digit', 250);
 
@@ -69,13 +69,13 @@ switch(lower(p.Results.data_name))
         % meas = [150 4] double measurements
         % species = {150 1} cell array of strings
         
-        meas = S.meas;
+        meas = S.meas';
 
         % Change species strings to integer category labels
         spec = unique(S.species); 
-        labels = zeros(length(S.species),1); 
-        for ii=1:length(S.species), 
-            labels(ii)=find(ismember(spec,S.species(ii))==1); 
+        labels = zeros(1,length(S.species)); 
+        for ii = 1:length(S.species), 
+            labels(ii) = find(ismember(spec,S.species(ii)) == 1); 
         end
 
     case 'sciencenews'
@@ -83,17 +83,19 @@ switch(lower(p.Results.data_name))
         S = load('X20');
         
         labels = S.classes(:,1);
-        labels = labels(labels > 0);
+        labels = labels(labels > 0)';
         X0 = S.X(labels > 0, :)';
         
-        % Reduce dimensionality
+        % Reduce dimensionality with randomized PCA
         if (p.Results.dim > 0),
-            ndims = p.Results.dim;
-            [~, S, V] = svd(X0,0);
-            meas = V(:,1:ndims)*S(1:ndims,1:ndims); 
+            cm = mean(X0,2);
+            X = X0 - repmat(cm, 1, size(X0,2));
+            [~,S,V] = randPCA(X, p.Results.dim);
+            X = S*V';
+            meas = X;
         else
-            meas = X0';
-        end
+            meas = X0;
+        end;
         
   case 'mnist_digits'
 
@@ -102,17 +104,19 @@ switch(lower(p.Results.data_name))
         
         % try randomizing order...
         idxs = randperm(size(X0,2));
-        labels = labels(idxs);
+        labels = labels(idxs)';
         X0 = X0(:,idxs);
 
-        % Reduce dimensionality
+        % Reduce dimensionality with randomized PCA
         if (p.Results.dim > 0),
-            ndims = p.Results.dim;
-            [~, S, V] = svd(X0,0);
-            meas = V(:,1:ndims)*S(1:ndims,1:ndims); 
+            cm = mean(X0,2);
+            X = X0 - repmat(cm, 1, size(X0,2));
+            [~,S,V] = randPCA(X, p.Results.dim);
+            X = S*V';
+            meas = X;
         else
-            meas = X0';
-        end
+            meas = X0;
+        end;
 
 end
 

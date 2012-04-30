@@ -2,9 +2,13 @@
 % close all
 % clc
 
-%% Pick a data set
+%% Go parallel
+if matlabpool('size')==0,
+    matlabpool
+end;
 
-pExampleNames  = {'MNIST_Digits', 'ScienceNews'};
+%% Pick a data set
+pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews'};
 
 fprintf('\n Examples:\n');
 for k = 1:length(pExampleNames),
@@ -16,18 +20,16 @@ pExampleIdx = input('Pick an example to run: \n');
 
 pGWTversion = 0;
 
-%% generate data and choose parameters for GWT
-
+% Generate data and choose parameters for GWT
 [X, GWTopts, imgOpts] = GenerateData_and_SetParameters(pExampleNames{pExampleIdx});
 
-%% construct geometric wavelets
-
+% Construct geometric wavelets
 GWTopts.GWTversion = pGWTversion;
 GWT = GMRA(X, GWTopts);
 
-%% compute all wavelet coefficients 
-
+% Compute all wavelet coefficients 
 [GWT, Data] = GWT_trainingData(GWT, X);
+
 
 %% Test original data
 
@@ -35,10 +37,9 @@ data_set = pExampleNames{pExampleIdx};
 
 % [data, labels] = lda_generateData(data_set, 'dim', 30, 'digits', [1 2 3], 'n_ea_digit', 1000);
 
-data = GWT.X;
 labels = imgOpts.Labels;
 
-[total_errors, std_errors] = lda_crossvalidation( data, labels );
+[total_errors, std_errors] = lda_crossvalidation( GWT.X, labels );
 
 n_pts = length(labels);
 n_cats = length(unique(labels));
@@ -61,12 +62,12 @@ results = struct();
 for idx = 1:length(GWT.cp),
     
     if ~COMBINED || idx == length(GWT.cp),
-        coeffs = cat(1,Data.CelScalCoeffs{Data.Cel_cpidx == idx});
+        coeffs = cat(1, Data.CelScalCoeffs{Data.Cel_cpidx == idx})';
     else
-        coeffs = cat(2,cat(1,Data.CelScalCoeffs{Data.Cel_cpidx == idx}),cat(1,Data.CelWavCoeffs{Data.Cel_cpidx == idx}));
+        coeffs = cat(2, cat(1, Data.CelScalCoeffs{Data.Cel_cpidx == idx}), cat(1,Data.CelWavCoeffs{Data.Cel_cpidx == idx}))';
     end
     dataIdxs = GWT.PointsInNet{idx};
-    dataLabels = imgOpts.Labels(dataIdxs)';
+    dataLabels = imgOpts.Labels(dataIdxs);
 
     n_pts = length(dataLabels);
     n_cats = length(unique(dataLabels));
@@ -95,7 +96,7 @@ end
 % http://stackoverflow.com/questions/5065051/add-node-numbers-get-node-locations-from-matlabs-treeplot
 
 figure;
-treeplot(GWT.cp,'k.','c');
+treeplot(GWT.cp, 'k.', 'c');
 count = size(GWT.cp,2);
 [x,y] = treelayout(GWT.cp);
 x = x';
