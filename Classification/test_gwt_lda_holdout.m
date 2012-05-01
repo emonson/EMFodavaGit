@@ -3,9 +3,9 @@
 % clc
 
 %% Go parallel
-if matlabpool('size')==0,
-    matlabpool
-end;
+% if matlabpool('size')==0,
+%     matlabpool
+% end;
 
 %% Pick a data set
 pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews'};
@@ -39,17 +39,17 @@ data_set = pExampleNames{pExampleIdx};
 
 labels = imgOpts.Labels;
 
-[total_errors, std_errors] = lda_crossvalidation( GWT.X, labels );
+% [total_errors, std_errors] = lda_crossvalidation( GWT.X, labels );
 
 n_pts = length(labels);
 n_cats = length(unique(labels));
 
-fprintf(1, '\nOriginal\n');
-fprintf(1, '\nData set: %s\n', data_set);
-fprintf(1, 'Categories: %d, Data points: %d\n', n_cats, n_pts);
-fprintf(1, 'Avg Accuracy: %3.2f\n', 1.0 - total_errors/n_pts);
-fprintf(1, 'Error Rate: %d / %d\n', total_errors, n_pts);
-fprintf(1, 'Standar dev: %3.2f\n\n', std_errors);
+% fprintf(1, '\nOriginal\n');
+% fprintf(1, '\nData set: %s\n', data_set);
+% fprintf(1, 'Categories: %d, Data points: %d\n', n_cats, n_pts);
+% fprintf(1, 'Avg Accuracy: %3.2f\n', 1.0 - total_errors/n_pts);
+% fprintf(1, 'Error Rate: %d / %d\n', total_errors, n_pts);
+% fprintf(1, 'Standar dev: %3.2f\n\n', std_errors);
 
 %% Test holdout data split for classifier accuracy measurement
 
