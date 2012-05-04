@@ -15,69 +15,39 @@ end;
 % DataSet.opts = struct('NumberOfPoints',2000,'EmbedDim',50);
 
 fprintf('creating training data...\n');
-DataSet.name = 'BMark_MNIST';
+DataSet.name = 'ScienceNews';
 
-n_train = 2000;
-n_test = 100;
-n_total = n_train + n_test;
+[X, GWTopts, imgOpts] = GenerateData_and_SetParameters(DataSet.name);
 
-rand_idxs = randperm(n_total);
-idxs_test = rand_idxs(1:n_test);
-idxs_train = rand_idxs(n_test+1:end);
+labels = imgOpts.Labels;
+[YY,II] = sort(labels);
+labels = labels(II);
+X = X(:,II);
 
-train_digits = [2 3 5 6 9];
-anomalous_digits = [1];
-INCLUDE_ANOMALOUS = true;
+% randomly take percentage of document for training
+rand_idxs = rand([1 size(X,2)]) > 0.05;
 
-X_train_sets = cell(1, length(train_digits));
-X_test_sets = cell(1, length(train_digits) + length(anomalous_digits));
+% these are the categories for training
+cat_idxs = labels ~= 1;
 
-for ii = 1:length(train_digits),
-    DataSet.opts = struct('NumberOfPoints', n_total, 'MnistOpts', struct('Sampling', 'RandN', 'QueryDigits', train_digits(ii), 'ReturnForm', 'vector'));
-    tmp = GenerateDataSets( DataSet.name, DataSet.opts );
-    X_train_sets{ii} = tmp(:,idxs_train);
-    X_test_sets{ii} = tmp(:,idxs_test);
-end;
+X_train = X(:, (rand_idxs & cat_idxs));
+labels_train = labels((rand_idxs & cat_idxs));
 
-if INCLUDE_ANOMALOUS,
-    for ii = 1:length(anomalous_digits),
-        DataSet.opts = struct('NumberOfPoints', n_test, 'MnistOpts', struct('Sampling', 'RandN', 'QueryDigits', anomalous_digits(ii), 'ReturnForm', 'vector'));
-        X_test_sets{ii+length(train_digits)} = GenerateDataSets( DataSet.name, DataSet.opts );
-    end;
-end;
+% take the rest of the document for validation
+X_val = X(:, ~(rand_idxs & cat_idxs));
+labels_val = labels(~(rand_idxs & cat_idxs));
 
-X_train = cell2mat(X_train_sets);
-X_val = cell2mat(X_test_sets);
-clear('X_train_sets','X_test_sets','tmp');
+DataSet.opts = struct('NumberOfPoints', length(labels_val));
 
 %% Create the GWT and SVD models (this is fast enough)
 
 % Set GMRA parameters (original script_test_blip values)
-GWTopts = struct('GWTversion',0);
-GWTopts.ManifoldDimension = 2;
-GWTopts.threshold1 = 1e-3;
-GWTopts.threshold2 = .1;
-GWTopts.addTangentialCorrections = true;
-GWTopts.sparsifying = false;
-GWTopts.splitting = false;
-GWTopts.knn = 30;
-GWTopts.knnAutotune = 20;
-GWTopts.smallestMetisNet = 10;
-GWTopts.verbose = 1;
-GWTopts.shrinkage = 'hard';
-GWTopts.avoidLeafnodePhi = false;
-GWTopts.mergePsiCapIntoPhi  = true;
-GWTopts.coeffs_threshold = 0;
-GWTopts.errorType = 'relative';
-GWTopts.threshold0 = 0.5;
-GWTopts.precision  = 1e-4;
-
-% These are the values used in the GWT RunExamples code...
-% GWTopts.threshold1 = sqrt(2)*(1-cos(pi/24));    % threshold of singular values for determining the rank of each ( I - \Phi_{j,k} * \Phi_{j,k} ) * Phi_{j+1,k'}
-% GWTopts.threshold2 = sqrt(2)*sin(pi/24);        % threshold for determining the rank of intersection of ( I - \Phi_{j,k} * \Phi_{j,k} ) * Phi_{j+1,k'}
-% GWTopts.addTangentialCorrections = false;
+% GWTopts = struct('GWTversion',0);
+% GWTopts.ManifoldDimension = 2;
+% GWTopts.threshold1 = 1e-3;
+% GWTopts.threshold2 = .1;
+% GWTopts.addTangentialCorrections = true;
 % GWTopts.sparsifying = false;
-% GWTopts.sparsifying_method = 'ksvd'; % or 'spams'
 % GWTopts.splitting = false;
 % GWTopts.knn = 30;
 % GWTopts.knnAutotune = 20;
@@ -85,11 +55,12 @@ GWTopts.precision  = 1e-4;
 % GWTopts.verbose = 1;
 % GWTopts.shrinkage = 'hard';
 % GWTopts.avoidLeafnodePhi = false;
-% GWTopts.mergePsiCapIntoPhi  = false;
-% GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
-% GWTopts.threshold0 = 0.5; % threshold for choosing pca dimension at each nonleaf node
+% GWTopts.mergePsiCapIntoPhi  = true;
+% GWTopts.coeffs_threshold = 0;
 % GWTopts.errorType = 'relative';
-% GWTopts.precision  = .050; % only for leaf nodes
+% GWTopts.threshold0 = 0.5;
+% GWTopts.precision  = 1e-4;
+
 
 %% Compute GWT and the transform of the data
 fprintf('\n Computing GMRA and associated transforms...');

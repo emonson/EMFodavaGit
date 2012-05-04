@@ -28,6 +28,7 @@ idxs_train = rand_idxs(n_test+1:end);
 train_digits = [2 3 5 6 9];
 anomalous_digits = [1];
 INCLUDE_ANOMALOUS = true;
+RANDOMIZE_ANOMALOUS = true;
 
 X_train_sets = cell(1, length(train_digits));
 X_test_sets = cell(1, length(train_digits) + length(anomalous_digits));
@@ -39,13 +40,24 @@ for ii = 1:length(train_digits),
     X_test_sets{ii} = tmp(:,idxs_test);
 end;
 
-if INCLUDE_ANOMALOUS,
+if RANDOMIZE_ANOMALOUS,
     for ii = 1:length(anomalous_digits),
         DataSet.opts = struct('NumberOfPoints', n_test, 'MnistOpts', struct('Sampling', 'RandN', 'QueryDigits', anomalous_digits(ii), 'ReturnForm', 'vector'));
-        X_test_sets{ii+length(train_digits)} = GenerateDataSets( DataSet.name, DataSet.opts );
+        tmp = GenerateDataSets( DataSet.name, DataSet.opts );
+        if RANDOMIZE_ANOMALOUS,
+            n_pixels = size(tmp,1);
+            for jj = 1:size(tmp,2),
+                if true, % rand() < 1,
+                    rand_idxs = randperm(n_pixels);
+                    tmp_vec = tmp(rand_idxs,jj);
+                    tmp(:,jj) = tmp_vec;
+                end;
+            end
+        end;
+        X_test_sets{ii+length(train_digits)} = tmp;
     end;
 end;
-
+    
 X_train = cell2mat(X_train_sets);
 X_val = cell2mat(X_test_sets);
 clear('X_train_sets','X_test_sets','tmp');
@@ -53,31 +65,12 @@ clear('X_train_sets','X_test_sets','tmp');
 %% Create the GWT and SVD models (this is fast enough)
 
 % Set GMRA parameters (original script_test_blip values)
-GWTopts = struct('GWTversion',0);
-GWTopts.ManifoldDimension = 2;
-GWTopts.threshold1 = 1e-3;
-GWTopts.threshold2 = .1;
-GWTopts.addTangentialCorrections = true;
-GWTopts.sparsifying = false;
-GWTopts.splitting = false;
-GWTopts.knn = 30;
-GWTopts.knnAutotune = 20;
-GWTopts.smallestMetisNet = 10;
-GWTopts.verbose = 1;
-GWTopts.shrinkage = 'hard';
-GWTopts.avoidLeafnodePhi = false;
-GWTopts.mergePsiCapIntoPhi  = true;
-GWTopts.coeffs_threshold = 0;
-GWTopts.errorType = 'relative';
-GWTopts.threshold0 = 0.5;
-GWTopts.precision  = 1e-4;
-
-% These are the values used in the GWT RunExamples code...
-% GWTopts.threshold1 = sqrt(2)*(1-cos(pi/24));    % threshold of singular values for determining the rank of each ( I - \Phi_{j,k} * \Phi_{j,k} ) * Phi_{j+1,k'}
-% GWTopts.threshold2 = sqrt(2)*sin(pi/24);        % threshold for determining the rank of intersection of ( I - \Phi_{j,k} * \Phi_{j,k} ) * Phi_{j+1,k'}
-% GWTopts.addTangentialCorrections = false;
+% GWTopts = struct('GWTversion',0);
+% GWTopts.ManifoldDimension = 2;
+% GWTopts.threshold1 = 1e-3;
+% GWTopts.threshold2 = .1;
+% GWTopts.addTangentialCorrections = true;
 % GWTopts.sparsifying = false;
-% GWTopts.sparsifying_method = 'ksvd'; % or 'spams'
 % GWTopts.splitting = false;
 % GWTopts.knn = 30;
 % GWTopts.knnAutotune = 20;
@@ -85,11 +78,30 @@ GWTopts.precision  = 1e-4;
 % GWTopts.verbose = 1;
 % GWTopts.shrinkage = 'hard';
 % GWTopts.avoidLeafnodePhi = false;
-% GWTopts.mergePsiCapIntoPhi  = false;
-% GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
-% GWTopts.threshold0 = 0.5; % threshold for choosing pca dimension at each nonleaf node
+% GWTopts.mergePsiCapIntoPhi  = true;
+% GWTopts.coeffs_threshold = 0;
 % GWTopts.errorType = 'relative';
-% GWTopts.precision  = .050; % only for leaf nodes
+% GWTopts.threshold0 = 0.5;
+% GWTopts.precision  = 1e-4;
+
+% These are the values used in the GWT RunExamples code...
+GWTopts.threshold1 = sqrt(2)*(1-cos(pi/24));    % threshold of singular values for determining the rank of each ( I - \Phi_{j,k} * \Phi_{j,k} ) * Phi_{j+1,k'}
+GWTopts.threshold2 = sqrt(2)*sin(pi/24);        % threshold for determining the rank of intersection of ( I - \Phi_{j,k} * \Phi_{j,k} ) * Phi_{j+1,k'}
+GWTopts.addTangentialCorrections = false;
+GWTopts.sparsifying = false;
+GWTopts.sparsifying_method = 'ksvd'; % or 'spams'
+GWTopts.splitting = false;
+GWTopts.knn = 30;
+GWTopts.knnAutotune = 20;
+GWTopts.smallestMetisNet = 10;
+GWTopts.verbose = 1;
+GWTopts.shrinkage = 'hard';
+GWTopts.avoidLeafnodePhi = false;
+GWTopts.mergePsiCapIntoPhi  = false;
+GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
+GWTopts.threshold0 = 0.5; % threshold for choosing pca dimension at each nonleaf node
+GWTopts.errorType = 'relative';
+GWTopts.precision  = .050; % only for leaf nodes
 
 %% Compute GWT and the transform of the data
 fprintf('\n Computing GMRA and associated transforms...');
