@@ -1,0 +1,127 @@
+% Script for testing dynamic/manifold and a cusp singularity that grows at an unkown location of a manifold based on the GRMA framework
+
+close all;
+clear all;
+
+%% Go parallel
+if matlabpool('size')==0,
+    matlabpool
+end;
+
+pQuantile = 0.1;                        % This is used as a local parameter to detect anomalies
+
+%% Generate training data set
+DataSet.name = 'SwissRoll';
+DataSet.opts = struct('NumberOfPoints',5000,'EmbedDim',50,'NoiseType','Gaussian','NoiseParam',0.001);
+
+%DataSet.name = 'BMark_MNIST';
+%DataSet.opts = struct('NumberOfPoints',2000,'MnistOpts',struct('Sampling', 'RandN', 'QueryDigits',7, 'ReturnForm', 'vector'));
+
+disp('creating training data...')
+X_train = GenerateDataSets( DataSet.name, DataSet.opts );
+
+%% Create the GWT and SVD models
+fprintf('\n Computing GMRA and associated transforms...');
+
+% Set GMRA parameters
+GWTopts = struct('GWTversion',0);
+GWTopts.ManifoldDimension = 2;
+GWTopts.threshold1 = 1e-3;
+GWTopts.threshold2 = .1;
+GWTopts.addTangentialCorrections = true;
+GWTopts.sparsifying = false;
+GWTopts.splitting = false;
+GWTopts.knn = 30;
+GWTopts.knnAutotune = 20;
+GWTopts.smallestMetisNet = 10;
+GWTopts.verbose = 1;
+GWTopts.shrinkage = 'hard';
+GWTopts.avoidLeafnodePhi = false;
+GWTopts.mergePsiCapIntoPhi  = true;
+GWTopts.coeffs_threshold = 0;
+GWTopts.errorType = 'relative';
+GWTopts.threshold0 = 0.5;
+GWTopts.precision  = 1e-4;
+
+% Do GMRA
+Timings.GMRA = cputime;
+gMRA = GMRA(X_train,GWTopts);
+DataGWT = FGWT(gMRA,X_train);
+Timings.GMRA = cputime-Timings.GMRA;
+
+%% Build a family of models, one per GWT scale, for the density
+fprintf('\n Constructing GWT models...');
+
+% Allocate memory
+nScales = max(gMRA.Scales);
+TimingsGWT_DensEst = zeros(nScales,1);
+DensEst_GMRA = cell(1, nScales);
+
+for j = 1:nScales,
+    % Estimate density at scale j
+    fprintf('\n Model at scale %d...',j);
+    TimingsGWT_DensEst(j) = cputime;
+    opts = struct('j', j, 'DensityEstimationMode', 'ScalingWaveletJoint');
+    opts.Normalization = {'none', 'none'}; 
+    opts.Normalization = {'zscore', 'zscore'};     % Both of these options seem to work...
+    DensEst_GMRA{j} = GMRA_MeasureEstimate( gMRA, X_train, DataGWT, opts);
+    TimingsGWT_DensEst(j) = cputime-TimingsGWT_DensEst(j);
+end;
+
+Timings.GWT_DensEst = TimingsGWT_DensEst; clear TimingsGWT_DensEst;
+
+%% Now validate the model on a different random sample from the data set
+% TBD: this should be compared to the training set above and used as calibration of the estimators
+
+X_val = GenerateDataSets( DataSet.name, DataSet.opts );
+
+DataGWT_val = FGWT(gMRA, X_val);
+
+fprintf('\n Running models on validation data...');
+
+TimingsGWT_DensVal = zeros(nScales,1);
+LogL_Val = zeros(1, nScales);
+GMRA_Measure_Val = cell(1,nScales);
+
+for j = 1:nScales,
+    TimingsGWT_DensVal(j) = cputime;
+    
+    [GMRA_Measure_Val{j}, LogL_Val(j)] = GMRA_MeasureEvaluate( DensEst_GMRA{j}, X_val, struct('mode', 'GMRA', 'GMRA', gMRA) );
+    
+    TimingsGWT_DensVal(j) = cputime-TimingsGWT_DensVal(j);
+end;
+
+Timings.GWT_DensVal = TimingsGWT_DensVal; 
+clear('TimingsGWT_DensVal');
+
+opts=struct('quantile', pQuantile);
+opts.ratio = DensEst_GMRA;
+
+LLmat = GMRA_DisplayMeasureEval( gMRA, DataGWT_val, GMRA_Measure_Val, opts );
+
+fprintf('done.');
+
+matF = LLmat;
+
+%% Automatic selection of optimal scale for anomaly detection
+matF_sort = sort(matF,2,'ascend');
+infloc = isinf(matF_sort);
+matF_sort(infloc)= 0;
+matF_sort(infloc) = min(min(matF_sort));
+meanlogL = mean(matF_sort(:,1:round(DataSet.opts.NumberOfPoints/100)),2);
+[~,jopt] = min(meanlogL);
+
+figure; 
+plot(meanlogL, '-*'); 
+hold on; 
+plot(jopt,meanlogL(jopt), 'ro', 'MarkerSize', 12);
+title('mean logL versus scale');
+
+figure; 
+scatter3(X_val(1,:), X_val(2,:), X_val(3,:), 10, LLmat(jopt,:), 'filled');
+colorbar;
+title('data set colored by logL');
+
+fprintf('\n');
+
+return;

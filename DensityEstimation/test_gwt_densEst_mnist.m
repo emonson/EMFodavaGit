@@ -40,7 +40,7 @@ for ii = 1:length(train_digits),
     X_test_sets{ii} = tmp(:,idxs_test);
 end;
 
-if RANDOMIZE_ANOMALOUS,
+if INCLUDE_ANOMALOUS,
     for ii = 1:length(anomalous_digits),
         DataSet.opts = struct('NumberOfPoints', n_test, 'MnistOpts', struct('Sampling', 'RandN', 'QueryDigits', anomalous_digits(ii), 'ReturnForm', 'vector'));
         tmp = GenerateDataSets( DataSet.name, DataSet.opts );
