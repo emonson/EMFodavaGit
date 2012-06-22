@@ -3,12 +3,16 @@
 % clc
 
 %% Go parallel
-% if matlabpool('size')==0,
-%     matlabpool
-% end;
+if matlabpool('size')==0,
+    matlabpool
+end;
 
 %% Pick a data set
-pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews'};
+pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews',...
+                  'Medical12images','Medical12Sift','CorelImages','CorelSift',...
+                  'Olivetti_faces',...
+                  '20NewsSubset1','20NewsSubset2tf','20NewsSubset3','20NewsSubset4', ...
+                  '20NewsCompSetOf5'};
 
 fprintf('\n Examples:\n');
 for k = 1:length(pExampleNames),
@@ -21,15 +25,21 @@ pExampleIdx = input('Pick an example to run: \n');
 pGWTversion = 0;
 
 % Generate data and choose parameters for GWT
-[X, GWTopts, imgOpts] = GenerateData_and_SetParameters(pExampleNames{pExampleIdx});
+[X, GWTopts, imgOpts] = EMo_GenerateData_and_SetParameters(pExampleNames{pExampleIdx});
 
 % Construct geometric wavelets
 GWTopts.GWTversion = pGWTversion;
+fprintf(1, '\nGMRA\n\n');
 GWT = GMRA(X, GWTopts);
 
 % Compute all wavelet coefficients 
+fprintf(1, 'GWT Training Data\n\n');
 [GWT, Data] = GWT_trainingData(GWT, X);
 
+% Deleting some unneeded data for memory's sake
+% Data = rmfield(Data,'Projections');
+% Data = rmfield(Data,'TangentialCorrections');
+Data = rmfield(Data,'MatWavCoeffs');
 
 %% Test original data
 
@@ -60,6 +70,10 @@ COMBINED = false;
 results = struct();
 
 for idx = 1:length(GWT.cp),
+    
+    if mod(idx, 100) == 0,
+        fprintf(1, 'LDA cross-validation node %d of %d\n', idx, length(GWT.cp));
+    end
     
     if ~COMBINED || idx == length(GWT.cp),
         coeffs = cat(1, Data.CelScalCoeffs{Data.Cel_cpidx == idx})';
@@ -95,20 +109,38 @@ end
 %% Tree of results
 % http://stackoverflow.com/questions/5065051/add-node-numbers-get-node-locations-from-matlabs-treeplot
 
-figure;
+H = figure;
 treeplot(GWT.cp, 'k.', 'c');
+
+% treeplot is limited with control of colors, etc.
+P = findobj(H, 'Color', 'c');
+set(P, 'Color', [247 201 126]/255);
+
 count = size(GWT.cp,2);
 [x,y] = treelayout(GWT.cp);
 x = x';
 y = y';
-errors_array = [results(:).total_errors];
-numerrors = cellstr(num2str(errors_array'));
-nptsinnode = cellstr(num2str((cellfun(@(x) size(x,2),GWT.PointsInNet))'));
-childerrors = zeros(1,length(numerrors));
-for ii = 1:length(childerrors),
-   childerrors(ii) = sum(errors_array(GWT.cp == ii)); 
+error_array = [results(:).total_errors];
+error_strings = cellstr(num2str(error_array'));
+std_array = [results(:).std_errors];
+std_strings = cellstr(num2str(round(std_array)'));
+nptsinnode_strings = cellstr(num2str((cellfun(@(x) size(x,2),GWT.PointsInNet))'));
+
+childerr = zeros(length(error_array), 1);
+childstd = zeros(length(std_array), 1);
+for ii = 1:length(childerr),
+   childerr(ii) = sum(error_array(GWT.cp == ii));
+   childstd(ii) = sum(std_array(GWT.cp == ii));
 end
-childerrvalues = cellstr(num2str(childerrors'));
-text(x(:,1), y(:,1), numerrors, 'VerticalAlignment','bottom','HorizontalAlignment','right')
-text(x(:,1), y(:,1), childerrvalues, 'VerticalAlignment','top','HorizontalAlignment','left','Color',[0.6 0.2 0.2])
-% title({['LDA cross validation: ' data_set]});
+childerr_strings = cellstr(num2str(childerr));
+childstd_strings = cellstr(num2str(round(childstd)));
+
+combo_strings = strcat(error_strings, '~', std_strings);
+childcombo_strings = strcat(childerr_strings, '~', childstd_strings);
+
+text(x(:,1), y(:,1), combo_strings, ...
+    'VerticalAlignment','bottom','HorizontalAlignment','right')
+text(x(:,1), y(:,1), childcombo_strings, ...
+    'VerticalAlignment','top','HorizontalAlignment','left','Color',[0.6 0.2 0.2])
+title({['LDA cross validation: ' strrep(data_set, '_', ' ') ' - ' num2str(n_pts) ' pts']}, ...
+    'Position', [0.01 1.02], 'HorizontalAlignment', 'Left', 'Margin', 10);
