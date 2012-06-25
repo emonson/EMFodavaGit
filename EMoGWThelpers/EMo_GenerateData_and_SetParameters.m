@@ -59,8 +59,8 @@ switch pExampleName
 
     % generate the dataset
     dataset = struct();
-    dataset.N = 5000;
-    dataset.digits = [0 1 2 3 4 5 6 7 8 9];
+    dataset.N = 2000;
+    dataset.digits = [3 5 6 9];
     dataset.projectionDimension = 0;
 
     [X0,GraphDiffOpts,NetsOpts,Labels] = GenerateDataSets( 'BMark_MNIST', ...
