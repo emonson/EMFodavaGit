@@ -119,7 +119,7 @@ tree_parent_idxs = GWT.cp;
 
 % Flag for error status on each node
 USE_SELF = 1;
-UNDECIDED = 0;
+UNDECIDED = -100;
 USE_CHILDREN = -1;
 
 % Start at root of the tree (cp(root_idx) == 0)
@@ -149,15 +149,16 @@ else
 
     while (~node_idxs.isEmpty())
         current_node_idx = node_idxs.removeLast();
+        fprintf( 'current node: %d\n', current_node_idx );
         
         % Get list of parent node indexes for use in a couple spots later
         % TODO: Move to a routine...
         current_parents_idxs = [];
-        tmp_idx = current_node_idx;
-        while (GWT.cp(tmp_idx) > 0), 
-            tmp = GWT.cp(tmp_idx); 
-            current_parents_idxs(end+1) = tmp; 
-            tmp_idx = tmp; 
+        tmp_current_idx = current_node_idx;
+        while (tree_parent_idxs(tmp_current_idx) > 0), 
+            tmp_parent_idx = tree_parent_idxs(tmp_current_idx); 
+            current_parents_idxs(end+1) = tmp_parent_idx; 
+            tmp_current_idx = tmp_parent_idx; 
         end
         
         % Get children of the current node
@@ -173,27 +174,27 @@ else
             results(current_child_idx).self_error = total_errors;
             results(current_child_idx).self_std = std_errors;
             results(current_child_idx).error_value_to_use = UNDECIDED;
-            fprintf( '\tchild node: %d\n', current_node_idx );
+            % fprintf( '\tchild node: %d\n', current_child_idx );
         end
         
         % Set children errors to child sum
-        children_errors = sum( [results(current_children_idxs).self_error] );
-        results(current_node_idx).direct_children_errors = children_errors;
-        results(current_node_idx).best_children_errors = children_errors;
+        children_error_sum = sum( [results(current_children_idxs).self_error] );
+        results(current_node_idx).direct_children_errors = children_error_sum;
+        results(current_node_idx).best_children_errors = children_error_sum;
         
         % Compare children results to self error
         self_error = results(current_node_idx).self_error;
         % NOTE: Here is where to put some slop based on standard deviation
-        if (self_error < children_errors)
+        if (self_error < children_error_sum)
             % Set status = USE_SELF
-            results(current_child_idx).error_value_to_use = USE_SELF;
+            results(current_node_idx).error_value_to_use = USE_SELF;
             
         else
             % Set status = USE_CHILDREN
-            results(current_child_idx).error_value_to_use = USE_CHILDREN;
+            results(current_node_idx).error_value_to_use = USE_CHILDREN;
             
             % Propagate difference up parent chain
-            error_difference = self_error - children_errors;
+            error_difference = self_error - children_error_sum;
             % Loop through list of parent nodes
             for parent_node_idx = current_parents_idxs,
                 
@@ -221,7 +222,7 @@ else
                         continue;
                     end
                 else
-                    fprintf('\nERROR: parent error status flag not set properly!!\n');
+                    fprintf('\nERROR: parent error status flag not set properly on index %d!!\n', parent_node_idx);
                 end
             end
         end
@@ -241,10 +242,13 @@ else
         use_self_depth = find(parent_status_flags == USE_SELF, 1, 'first');
         % Depth set with this test
         % Root node or not found gives empty find result
-        use_self_depth_low_enough = isempty(use_self_depth) || (use_self_depth < 2);
+        
+        % TODO: use_self_depth test more than 0 seems to be
+        %   oversubtracting!!
+        use_self_depth_low_enough = isempty(use_self_depth) || (use_self_depth <= 0);
         
         % All children must have finite error sums to go lower in any child
-        all_children_errors_finite = isfinite(children_errors);
+        all_children_errors_finite = isfinite(children_error_sum);
         
         % Only addFirst children on to the stack if this node qualifies
         if (use_self_depth_low_enough && all_children_errors_finite)
@@ -287,18 +291,20 @@ end
 childerr_strings = cellstr(num2str(childerr));
 childstd_strings = cellstr(num2str(round(childstd)));
 
-combo_strings = strcat(error_strings, '~', std_strings);
-childcombo_strings = strcat(childerr_strings, '~', childstd_strings);
+% combo_strings = strcat(error_strings, '~', std_strings);
+% childcombo_strings = strcat(childerr_strings, '~', childstd_strings);
+combo_strings = error_strings;
+childcombo_strings = childerr_strings;
 
 % Node errors
-% text(x(:,1), y(:,1), combo_strings, ...
-%     'VerticalAlignment','bottom','HorizontalAlignment','right')
-% % Child node errors
-% text(x(:,1), y(:,1), childcombo_strings, ...
-%     'VerticalAlignment','top','HorizontalAlignment','left','Color',[0.6 0.2 0.2])
+text(x(:,1), y(:,1), combo_strings, ...
+    'VerticalAlignment','bottom','HorizontalAlignment','right')
+% Child node errors
+text(x(:,1), y(:,1), childcombo_strings, ...
+    'VerticalAlignment','top','HorizontalAlignment','left','Color',[0.6 0.2 0.2])
 % Node cp index
-text(x(:,1), y(:,1), cp_idx_strings, ...
-    'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
+% text(x(:,1), y(:,1), cp_idx_strings, ...
+%     'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
 
 title({['LDA cross validation: ' strrep(data_set, '_', ' ') ' - ' num2str(n_pts) ' pts']}, ...
     'Position', [0.01 1.02], 'HorizontalAlignment', 'Left', 'Margin', 10);
