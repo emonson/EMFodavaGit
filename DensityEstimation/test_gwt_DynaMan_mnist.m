@@ -25,12 +25,12 @@ rand_idxs = randperm(n_total);
 idxs_test = rand_idxs(1:n_test);
 idxs_train = rand_idxs(n_test+1:end);
 
-train_digits = [3 5 6 9];
-anomalous_digits = [1];
+train_digits = [2 3 5 6 9];
+anomalous_digits = [0];
 INCLUDE_ANOMALOUS = true;
 RANDOMIZE_ANOMALOUS = false;
-REDUCED_DIMENSIONALITY = 20;
-NOISE_LEVEL = 0.1;
+REDUCED_DIMENSIONALITY = 100;
+NOISE_LEVEL = 0.0;
 
 X_train_sets = cell(1, length(train_digits));
 X_test_sets = cell(1, length(train_digits) + length(anomalous_digits));

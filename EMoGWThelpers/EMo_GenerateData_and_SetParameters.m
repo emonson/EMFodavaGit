@@ -59,8 +59,8 @@ switch pExampleName
 
     % generate the dataset
     dataset = struct();
-    dataset.N = 1000;
-    dataset.digits = [1 2 3];
+    dataset.N = 2000;
+    dataset.digits = [3 5 6 9];
     dataset.projectionDimension = 0;
 
     [X0,GraphDiffOpts,NetsOpts,Labels] = GenerateDataSets( 'BMark_MNIST', ...
@@ -79,7 +79,7 @@ switch pExampleName
     imgOpts.imC = 28;
     imgOpts.Labels = Labels'; % Should be nCats x nPoints
 
-    if dataset.projectionDimension>0 && dataset.projectionDimension<imgOpts.imR*imgOpts.imC,
+    if dataset.projectionDimension > 0 && dataset.projectionDimension < imgOpts.imR*imgOpts.imC,
         imgOpts.X0 = X0;
         imgOpts.cm = mean(X0,2);
         X = X0 - repmat(imgOpts.cm,1,dataset.N);
@@ -90,7 +90,8 @@ switch pExampleName
         imgOpts.V = U;
         imgOpts.isCompressed = true;
     else
-        X = X0; clear X0;
+        X = X0; 
+        clear('X0');
         imgOpts.isCompressed = false;
     end;
 
@@ -811,6 +812,48 @@ case '20NewsSubset4'
     % Default = true, which clears out the scaling functions at the
     % leaf nodes
     GWTopts.avoidLeafnodePhi = false;
+
+case '20NewsCompSetOf5'
+
+    S = load('/Users/emonson/Data/Fodava/EMoDocMatlabData/n20_set5train_TFcorr_121009.mat');
+
+    X = full(S.tdm_norm);
+
+    % GUI data
+    imgOpts.isTextData = true;
+    imgOpts.hasLabels = true;
+    imgOpts.hasLabelMeanings = true;
+    imgOpts.hasLabelSetNames = true;
+    imgOpts.hasDocFileNames = true;
+
+    imgOpts.Terms = S.terms';
+    imgOpts.Labels = S.labels;
+    imgOpts.LabelMeanings = S.newsgroups;
+    imgOpts.LabelSetNames = {'newsgroup'};
+    imgOpts.DocFileNames = S.names';
+
+    % EMonson options from older demo code
+    GWTopts.knn = 50;
+    GWTopts.knnAutotune = 10;
+    GWTopts.smallestMetisNet = 5;
+
+    % projection dimension
+    GWTopts.AmbientDimension = inf; 
+
+    GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
+
+    GWTopts.errorType = 'relative';
+    GWTopts.threshold0 = [0.9 0.8]; % threshold for choosing pca dimension at each nonleaf node
+    GWTopts.precision  = 0.001; % only for leaf nodes
+
+    GWTopts.coeffs_threshold = 0;
+    GWTopts.sparsifying = false;
+
+    % Default = true, which clears out the scaling functions at the
+    % leaf nodes
+    GWTopts.avoidLeafnodePhi = false;
+    
+    clear('S');
 
   case 'NaturalImagePatches'
 

@@ -14,20 +14,36 @@ pQuantile = 0.1;                        % This is used as a local parameter to d
 % DataSet.name = 'SwissRoll';
 % DataSet.opts = struct('NumberOfPoints',2000,'EmbedDim',50);
 
-DataSet.name = 'ScienceNews';
+% DataSet.name = 'ScienceNews';
+% DataSet.name = 'ScienceNewsTFIDF'; 
+% DataSet.name = 'ScienceNewsCounts';
+% DataSet.name = '20NewsSubset1';
+% DataSet.name = '20NewsSubset2tf';
+% DataSet.name = '20NewsSubset2tfidf';
+% DataSet.name = '20NewsSubset3';
+DataSet.name = '20NewsSubset4';
 
-[X, GWTopts, imgOpts] = GenerateData_and_SetParameters(DataSet.name);
+REDUCED_DIMENSIONALITY = 10;
+
+[X, GWTopts, imgOpts] = EMo_GenerateData_and_SetParameters(DataSet.name);
 
 labels = imgOpts.Labels;
 [YY,II] = sort(labels);
 labels = labels(II);
 X = X(:,II);
 
+if REDUCED_DIMENSIONALITY > 0,
+    cm = mean(X,2);
+    X0 = X - repmat(cm, [1 size(X,2)]);
+    [~,S,V] = randPCA(X0, REDUCED_DIMENSIONALITY);
+    X = S*V';
+end;
+
 % randomly take percentage of document for training
-rand_idxs = rand([1 size(X,2)]) > 0.05;
+rand_idxs = rand([1 size(X,2)]) > 0.15;
 
 % these are the categories for training
-cat_idxs = labels ~= 1;
+cat_idxs = labels ~= 2;
 
 X_train = X(:, (rand_idxs & cat_idxs));
 labels_train = labels((rand_idxs & cat_idxs));
@@ -118,6 +134,7 @@ LogL_Val = zeros(1, nScales);
 GMRA_Measure_Val = cell(1,nScales);
 
 for j = 1:nScales,
+    fprintf('\n Validation at scale %d...',j);
     TimingsGWT_DensVal(j) = cputime;
     
     [GMRA_Measure_Val{j}, LogL_Val(j)] = GMRA_MeasureEvaluate( DensEst_GMRA{j}, X_val, struct('mode', 'GMRA', 'GMRA', gMRA) );
