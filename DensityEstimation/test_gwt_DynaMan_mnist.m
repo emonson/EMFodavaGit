@@ -25,11 +25,11 @@ rand_idxs = randperm(n_total);
 idxs_test = rand_idxs(1:n_test);
 idxs_train = rand_idxs(n_test+1:end);
 
-train_digits = [0 2 5 6];
-anomalous_digits = [9];
+train_digits = [3 5 6 9];
+anomalous_digits = [1];
 INCLUDE_ANOMALOUS = true;
 RANDOMIZE_ANOMALOUS = false;
-REDUCED_DIMENSIONALITY = false;
+REDUCED_DIMENSIONALITY = 20;
 NOISE_LEVEL = 0.1;
 
 X_train_sets = cell(1, length(train_digits));
@@ -73,7 +73,7 @@ if REDUCED_DIMENSIONALITY > 0,
 
     cm = mean(X0,2);
     X = X0 - repmat(cm,1,size(X0,2));
-    [~,S,V] = randPCA(X, 50);
+    [~,S,V] = randPCA(X, REDUCED_DIMENSIONALITY);
     X2 = S*V';
 
     X_train = X2(:,1:n_train_pts);
