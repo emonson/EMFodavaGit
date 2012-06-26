@@ -195,11 +195,14 @@ else
             
             % Propagate difference up parent chain
             error_difference = self_error - children_error_sum;
+            fprintf('Node %d has %d error difference\n', current_node_idx, error_difference);
             % Loop through list of parent nodes
             for parent_node_idx = current_parents_idxs,
                 
                 % Subtract difference from best_children_errors
+                fprintf('\tParent node %d best children error %d\n', parent_node_idx, results(parent_node_idx).best_children_errors);
                 results(parent_node_idx).best_children_errors = results(parent_node_idx).best_children_errors - error_difference;
+                fprintf('\t\tnow down to %d\n', results(parent_node_idx).best_children_errors);
                 
                 % If parent.status = USE_CHILDREN
                 if (results(parent_node_idx).error_value_to_use == USE_CHILDREN)
@@ -245,7 +248,9 @@ else
         
         % TODO: use_self_depth test more than 0 seems to be
         %   oversubtracting!!
-        use_self_depth_low_enough = isempty(use_self_depth) || (use_self_depth <= 0);
+        % self_depth <= 0 allows self, so if self over, still puts children
+        % into queue
+        use_self_depth_low_enough = isempty(use_self_depth) || (use_self_depth < 0);
         
         % All children must have finite error sums to go lower in any child
         all_children_errors_finite = isfinite(children_error_sum);
@@ -303,8 +308,8 @@ text(x(:,1), y(:,1), combo_strings, ...
 text(x(:,1), y(:,1), childcombo_strings, ...
     'VerticalAlignment','top','HorizontalAlignment','left','Color',[0.6 0.2 0.2])
 % Node cp index
-% text(x(:,1), y(:,1), cp_idx_strings, ...
-%     'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
+text(x(:,1), y(:,1), cp_idx_strings, ...
+    'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
 
 title({['LDA cross validation: ' strrep(data_set, '_', ' ') ' - ' num2str(n_pts) ' pts']}, ...
     'Position', [0.01 1.02], 'HorizontalAlignment', 'Left', 'Margin', 10);
