@@ -2,6 +2,9 @@
 % close all
 % clc
 
+stream0 = RandStream('mt19937ar','Seed',2);
+RandStream.setGlobalStream(stream0);
+
 %% Go parallel
 if matlabpool('size')==0,
     matlabpool
@@ -75,6 +78,9 @@ results = struct();
 for ii = 1:length(GWT.cp),
     results(ii).self_error = NaN;
     results(ii).self_std = NaN;
+    results(ii).best_children_errors = NaN;
+    results(ii).direct_children_errors = NaN;
+    results(ii).error_value_to_use = NaN;
 end
 
 % Version that tests holdout for whole tree in cp order
@@ -133,7 +139,7 @@ else
     % so we need to first calculate the root node error
     [total_errors, std_errors] = gwt_single_node_lda( GWT, Data, imgOpts, root_idx, COMBINED );
 
-    % Record the results for the current node
+    % Record the results for the root node
     results(root_idx).self_error = total_errors;
     results(root_idx).self_std = std_errors;
     results(root_idx).error_value_to_use = UNDECIDED;
@@ -147,6 +153,7 @@ else
     node_idxs = java.util.ArrayDeque();
     node_idxs.addFirst(root_idx);
 
+    % Main loop to work iteratively down the tree breadth first
     while (~node_idxs.isEmpty())
         current_node_idx = node_idxs.removeLast();
         fprintf( 'current node: %d\n', current_node_idx );
@@ -177,10 +184,14 @@ else
             % fprintf( '\tchild node: %d\n', current_child_idx );
         end
         
-        % Set children errors to child sum
-        children_error_sum = sum( [results(current_children_idxs).self_error] );
-        results(current_node_idx).direct_children_errors = children_error_sum;
-        results(current_node_idx).best_children_errors = children_error_sum;
+        % If no children, want error to be infinite for any comparisons
+        children_error_sum = Inf;
+        % Set children errors to child sum (if there are children because sum([]) == 0)
+        if ~isempty(current_children_idxs)
+            children_error_sum = sum( [results(current_children_idxs).self_error] );
+            results(current_node_idx).direct_children_errors = children_error_sum;
+            results(current_node_idx).best_children_errors = children_error_sum;
+        end
         
         % Compare children results to self error
         self_error = results(current_node_idx).self_error;
@@ -213,7 +224,7 @@ else
                 elseif (results(parent_node_idx).error_value_to_use == USE_SELF)
                     % Compare best_children_errors to self_error
                     % NOTE: Here again use same slop test as above...
-                    % if parent.self_error < parent.best_children_errors
+                    % if still parent.self_error < parent.best_children_errors
                     if (results(parent_node_idx).self_error < results(parent_node_idx).best_children_errors),
                         % stop difference propagation
                         break;
@@ -221,7 +232,8 @@ else
                     else
                         % parent.status = USE_CHILDREN
                         results(parent_node_idx).error_value_to_use = USE_CHILDREN;
-                        % propagate difference up to parent
+                        % propagate this NEW difference up to parent
+                        error_difference = results(parent_node_idx).self_error - results(parent_node_idx).best_children_errors;
                         continue;
                     end
                 else
@@ -241,16 +253,19 @@ else
             % Push children on to queue for further processing
         % else
             % stop going any deeper
-        parent_status_flags = [results(current_parents_idxs).error_value_to_use];
-        use_self_depth = find(parent_status_flags == USE_SELF, 1, 'first');
+        self_parent_status_flags = [results([current_node_idx current_parents_idxs]).error_value_to_use];
+        use_self_depth = find(self_parent_status_flags == USE_SELF, 1, 'last');
         % Depth set with this test
         % Root node or not found gives empty find result
         
-        % TODO: use_self_depth test more than 0 seems to be
-        %   oversubtracting!!
-        % self_depth <= 0 allows self, so if self over, still puts children
-        % into queue
-        use_self_depth_low_enough = isempty(use_self_depth) || (use_self_depth < 0);
+        % Since now including self in find should give empty if all self
+        % and parents are USE_CHILDREN, and 1 if self is USE_SELF, so
+        % allowed_depth should start at 1 
+        ALLOWED_DEPTH = 20;
+        
+        % TODO: Somehtingnot working with depth test or something!!
+        
+        use_self_depth_low_enough = isempty(use_self_depth) || (use_self_depth <= ALLOWED_DEPTH);
         
         % All children must have finite error sums to go lower in any child
         all_children_errors_finite = isfinite(children_error_sum);
@@ -258,9 +273,16 @@ else
         % Only addFirst children on to the stack if this node qualifies
         if (use_self_depth_low_enough && all_children_errors_finite)
             % Find childrent of current node
+            % DEBUG
+            fprintf(' + + Current index: %d\n', current_node_idx);
             for idx = current_children_idxs
                 node_idxs.addFirst(idx);
+                fprintf(' + +   adding: %d\n', idx);
             end
+        else
+            % DEBUG
+            fprintf(' - - Current index: %d\n', current_node_idx);
+            fprintf(' - -   use_self_depth: %d, all_children_errors_finite: %d\n', use_self_depth_low_enough, all_children_errors_finite);
         end
     end
 end
@@ -280,6 +302,13 @@ set(P, 'Color', [247 201 126]/255);
 [x,y] = treelayout(GWT.cp);
 x = x';
 y = y';
+hold();
+
+% Show which nodes were used (self or children)
+ee = [results(:).error_value_to_use];
+use_self_bool = ee >= USE_SELF;
+plot(x(use_self_bool), y(use_self_bool), 'r.', 'MarkerSize', 20);
+
 error_array = [results(:).self_error];
 error_strings = cellstr(num2str(error_array'));
 std_array = [results(:).self_std];
@@ -287,26 +316,30 @@ std_strings = cellstr(num2str(round(std_array)'));
 % nptsinnode_strings = cellstr(num2str((cellfun(@(x) size(x,2), GWT.PointsInNet))'));
 cp_idx_strings = cellstr(num2str((1:length(GWT.cp))'));
 
-childerr = zeros(length(error_array), 1);
-childstd = zeros(length(std_array), 1);
-for ii = 1:length(childerr),
-   childerr(ii) = sum(error_array(GWT.cp == ii));
-   childstd(ii) = sum(std_array(GWT.cp == ii));
+childerr_strings = cell(length(GWT.cp),1);
+for ii = 1:length(GWT.cp),
+    childerr_strings{ii} = num2str(results(ii).direct_children_errors);
 end
-childerr_strings = cellstr(num2str(childerr));
-childstd_strings = cellstr(num2str(round(childstd)));
 
 % combo_strings = strcat(error_strings, '~', std_strings);
 % childcombo_strings = strcat(childerr_strings, '~', childstd_strings);
 combo_strings = error_strings;
 childcombo_strings = childerr_strings;
 
+besterr_strings = cell(length(GWT.cp),1);
+for ii = 1:length(GWT.cp),
+    besterr_strings{ii} = num2str(results(ii).best_children_errors);
+end
+
 % Node errors
 text(x(:,1), y(:,1), combo_strings, ...
     'VerticalAlignment','bottom','HorizontalAlignment','right')
 % Child node errors
 text(x(:,1), y(:,1), childcombo_strings, ...
-    'VerticalAlignment','top','HorizontalAlignment','left','Color',[0.6 0.2 0.2])
+    'VerticalAlignment','top','HorizontalAlignment','right','Color',[0.6 0.2 0.2])
+% Best Child node errors
+text(x(:,1), y(:,1), besterr_strings, ...
+    'VerticalAlignment','top','HorizontalAlignment','left','Color',[0.2 0.6 0.2])
 % Node cp index
 text(x(:,1), y(:,1), cp_idx_strings, ...
     'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
