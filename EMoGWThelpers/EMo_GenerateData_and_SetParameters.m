@@ -59,8 +59,8 @@ switch pExampleName
 
     % generate the dataset
     dataset = struct();
-    dataset.N = 1000;
-    dataset.digits = [1 2 3];
+    dataset.N = 2000;
+    dataset.digits = [1 2 3 4 5 6];
     dataset.projectionDimension = 0;
 
     [X0,GraphDiffOpts,NetsOpts,Labels] = GenerateDataSets( 'BMark_MNIST', ...
@@ -604,6 +604,159 @@ switch pExampleName
 
     GWTopts.errorType = 'relative';
     GWTopts.threshold0 = [0.85 0.75]; % threshold for choosing pca dimension at each nonleaf node
+    GWTopts.precision  = 0.001; % only for leaf nodes
+
+    GWTopts.coeffs_threshold = 0;
+    GWTopts.sparsifying = false;
+
+    % Default = true, which clears out the scaling functions at the
+    % leaf nodes
+    GWTopts.avoidLeafnodePhi = false;
+
+case '20NewsAllTrain'
+
+    load('/Users/emonson/Data/Fodava/EMoDocMatlabData/n20_setAll_tdm_20120711_train.mat');
+
+    % calculate TFIDF (std) normalization for word counts
+    nkj = sum(tdm,1)';      % how many terms in each document
+    D = size(tdm,2);        % number of documents
+    df = sum(tdm>0,2);      % number of documents each term shows up in
+    idf = log(D./(1+df));   % the 1+ is common to avoid divide-by-zero
+
+    [ii,jj,vv] = find(tdm);
+    vv_norm = (vv./nkj(jj)).*idf(ii);
+
+    tdm_norm = sparse(ii,jj,vv_norm);
+    
+    X = full(tdm_norm);
+
+    % GUI data
+    imgOpts.isTextData = true;
+    imgOpts.hasLabels = true;
+    imgOpts.hasLabelMeanings = true;
+    imgOpts.hasLabelSetNames = true;
+    imgOpts.hasDocFileNames = true;
+
+    imgOpts.Terms = terms';
+    imgOpts.Labels = labels;
+    imgOpts.LabelMeanings = newsgroups;
+    imgOpts.LabelSetNames = {'newsgroup'};
+    imgOpts.DocFileNames = names';
+
+    % EMonson options from older demo code
+    GWTopts.knn = 50;
+    GWTopts.knnAutotune = 10;
+    GWTopts.smallestMetisNet = 5;
+
+    % projection dimension
+    GWTopts.AmbientDimension = inf; 
+
+    GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
+
+    GWTopts.errorType = 'relative';
+    GWTopts.threshold0 = [0.9 0.8]; % threshold for choosing pca dimension at each nonleaf node
+    GWTopts.precision  = 0.001; % only for leaf nodes
+
+    GWTopts.coeffs_threshold = 0;
+    GWTopts.sparsifying = false;
+
+    % Default = true, which clears out the scaling functions at the
+    % leaf nodes
+    GWTopts.avoidLeafnodePhi = false;
+
+case '20NewsAllTest'
+
+    load('/Users/emonson/Data/Fodava/EMoDocMatlabData/n20_setAll_tdm_20120711_test.mat');
+
+    % calculate TFIDF (std) normalization for word counts
+    nkj = sum(tdm,1)';      % how many terms in each document
+    D = size(tdm,2);        % number of documents
+    df = sum(tdm>0,2);      % number of documents each term shows up in
+    idf = log(D./(1+df));   % the 1+ is common to avoid divide-by-zero
+
+    [ii,jj,vv] = find(tdm);
+    vv_norm = (vv./nkj(jj)).*idf(ii);
+
+    tdm_norm = sparse(ii,jj,vv_norm);
+    
+    X = full(tdm_norm);
+
+    % GUI data
+    imgOpts.isTextData = true;
+    imgOpts.hasLabels = true;
+    imgOpts.hasLabelMeanings = true;
+    imgOpts.hasLabelSetNames = true;
+    imgOpts.hasDocFileNames = true;
+
+    imgOpts.Terms = terms';
+    imgOpts.Labels = labels;
+    imgOpts.LabelMeanings = newsgroups;
+    imgOpts.LabelSetNames = {'newsgroup'};
+    imgOpts.DocFileNames = names';
+
+    % EMonson options from older demo code
+    GWTopts.knn = 50;
+    GWTopts.knnAutotune = 10;
+    GWTopts.smallestMetisNet = 5;
+
+    % projection dimension
+    GWTopts.AmbientDimension = inf; 
+
+    GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
+
+    GWTopts.errorType = 'relative';
+    GWTopts.threshold0 = [0.9 0.8]; % threshold for choosing pca dimension at each nonleaf node
+    GWTopts.precision  = 0.001; % only for leaf nodes
+
+    GWTopts.coeffs_threshold = 0;
+    GWTopts.sparsifying = false;
+
+    % Default = true, which clears out the scaling functions at the
+    % leaf nodes
+    GWTopts.avoidLeafnodePhi = false;
+
+case '20NewsAllCombo'
+
+    load('/Users/emonson/Data/Fodava/EMoDocMatlabData/n20_setAll_tdm_20120711_combo.mat');
+
+    % calculate TFIDF (std) normalization for word counts
+    nkj = sum(tdm,1)';      % how many terms in each document
+    D = size(tdm,2);        % number of documents
+    df = sum(tdm>0,2);      % number of documents each term shows up in
+    idf = log(D./(1+df));   % the 1+ is common to avoid divide-by-zero
+
+    [ii,jj,vv] = find(tdm);
+    vv_norm = (vv./nkj(jj)).*idf(ii);
+
+    tdm_norm = sparse(ii,jj,vv_norm);
+    
+    X = full(tdm_norm);
+
+    % GUI data
+    imgOpts.isTextData = true;
+    imgOpts.hasLabels = true;
+    imgOpts.hasLabelMeanings = true;
+    imgOpts.hasLabelSetNames = true;
+    imgOpts.hasDocFileNames = true;
+
+    imgOpts.Terms = terms';
+    imgOpts.Labels = labels;
+    imgOpts.LabelMeanings = newsgroups;
+    imgOpts.LabelSetNames = {'newsgroup'};
+    imgOpts.DocFileNames = names';
+
+    % EMonson options from older demo code
+    GWTopts.knn = 50;
+    GWTopts.knnAutotune = 10;
+    GWTopts.smallestMetisNet = 5;
+
+    % projection dimension
+    GWTopts.AmbientDimension = inf; 
+
+    GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
+
+    GWTopts.errorType = 'relative';
+    GWTopts.threshold0 = [0.9 0.8]; % threshold for choosing pca dimension at each nonleaf node
     GWTopts.precision  = 0.001; % only for leaf nodes
 
     GWTopts.coeffs_threshold = 0;

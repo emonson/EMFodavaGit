@@ -7,13 +7,14 @@ RandStream.setGlobalStream(stream0);
 
 %% Go parallel
 if matlabpool('size')==0,
-    matlabpool
+    matlabpool('OPEN',6);
 end;
 
 %% Pick a data set
-pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews',...
-                  'Medical12images','Medical12Sift','CorelImages','CorelSift',...
-                  'Olivetti_faces',...
+pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
+                  'Medical12images','Medical12Sift','CorelImages','CorelSift', ...
+                  'Olivetti_faces', ...
+                  '20NewsAllTrain', '20NewsAllTest', '20NewsAllCombo', ...
                   '20NewsSubset1','20NewsSubset2tf','20NewsSubset3','20NewsSubset4', ...
                   '20NewsCompSetOf5'};
 
@@ -35,9 +36,12 @@ GWTopts.GWTversion = pGWTversion;
 fprintf(1, '\nGMRA\n\n');
 GWT = GMRA(X, GWTopts);
 
+% Get rid of this original since have copy in GWT.X
+clear('X');
+
 % Compute all wavelet coefficients 
 fprintf(1, 'GWT Training Data\n\n');
-[GWT, Data] = GWT_trainingData(GWT, X);
+[GWT, Data] = GWT_trainingData(GWT, GWT.X);
 
 % Deleting some unneeded data for memory's sake
 % Data = rmfield(Data,'Projections');
@@ -123,6 +127,17 @@ end
 
 tree_parent_idxs = GWT.cp;
 
+% Container for child nodes which need to be freed up if a node eventually
+% switches from USE_SELF to USE_CHILDREN, but some children have stopped
+% propagating down the tree because they were past the ALLOWED_DEPTH of
+% the indexed node
+children_to_free = cell([length(GWT.cp) 1]);
+
+% Since now including self in find should give empty if all self
+% and parents are USE_CHILDREN, and 1 if self is USE_SELF, so
+% allowed_depth should start at 1 
+ALLOWED_DEPTH = 2;
+                
 % Flag for error status on each node
 USE_SELF = 1;
 UNDECIDED = -100;
@@ -137,7 +152,7 @@ if (length(root_idx) > 1)
 else
     % This routine calculates errors for the children of the current node
     % so we need to first calculate the root node error
-    [total_errors, std_errors] = gwt_single_node_lda( GWT, Data, imgOpts, root_idx, COMBINED );
+    [total_errors, std_errors] = gwt_single_node_lda_crossvalidation( GWT, Data, imgOpts, root_idx, COMBINED );
 
     % Record the results for the root node
     results(root_idx).self_error = total_errors;
@@ -175,7 +190,7 @@ else
         for current_child_idx = current_children_idxs,
 
             % Calculate the error on the current child
-            [total_errors, std_errors] = gwt_single_node_lda( GWT, Data, imgOpts, current_child_idx, COMBINED );
+            [total_errors, std_errors] = gwt_single_node_lda_crossvalidation( GWT, Data, imgOpts, current_child_idx, COMBINED );
 
             % Record the results for the current child
             results(current_child_idx).self_error = total_errors;
@@ -224,6 +239,7 @@ else
                 elseif (results(parent_node_idx).error_value_to_use == USE_SELF)
                     % Compare best_children_errors to self_error
                     % NOTE: Here again use same slop test as above...
+                    
                     % if still parent.self_error < parent.best_children_errors
                     if (results(parent_node_idx).self_error < results(parent_node_idx).best_children_errors),
                         % stop difference propagation
@@ -234,7 +250,18 @@ else
                         results(parent_node_idx).error_value_to_use = USE_CHILDREN;
                         % propagate this NEW difference up to parent
                         error_difference = results(parent_node_idx).self_error - results(parent_node_idx).best_children_errors;
-                        continue;
+                        % Since some children of this node might have
+                        % not added their children to the queue because
+                        % this node was too far up the tree for
+                        % ALLOWED_DEPTH, now that this has switched, need
+                        % to check those older nodes to see if now their
+                        % children should be added...
+                        for idx = children_to_free{parent_node_idx}
+                            node_idxs.addFirst(idx);
+                            fprintf(' * *   freeing: %d\n', idx);
+                        end
+                        children_to_free{parent_node_idx} = [];
+                       continue;
                     end
                 else
                     fprintf('\nERROR: parent error status flag not set properly on index %d!!\n', parent_node_idx);
@@ -253,22 +280,24 @@ else
             % Push children on to queue for further processing
         % else
             % stop going any deeper
-        self_parent_status_flags = [results([current_node_idx current_parents_idxs]).error_value_to_use];
+        self_parent_idx_chain = [current_node_idx current_parents_idxs];
+        self_parent_status_flags = [results(self_parent_idx_chain).error_value_to_use];
         use_self_depth = find(self_parent_status_flags == USE_SELF, 1, 'last');
         % Depth set with this test
         % Root node or not found gives empty find result
-        
-        % Since now including self in find should give empty if all self
-        % and parents are USE_CHILDREN, and 1 if self is USE_SELF, so
-        % allowed_depth should start at 1 
-        ALLOWED_DEPTH = 20;
-        
-        % TODO: Somehtingnot working with depth test or something!!
         
         use_self_depth_low_enough = isempty(use_self_depth) || (use_self_depth <= ALLOWED_DEPTH);
         
         % All children must have finite error sums to go lower in any child
         all_children_errors_finite = isfinite(children_error_sum);
+        
+        % If child errors are finite, but the node is too deep, keep track
+        % of the child indexes to add to the queue in case the USE_SELF
+        % node it's under switches to USE_CHILDREN
+        if (~use_self_depth_low_enough && all_children_errors_finite)
+            problem_parent_idx = self_parent_idx_chain(use_self_depth);
+            children_to_free{problem_parent_idx} = cat(2, children_to_free{problem_parent_idx}, current_children_idxs);
+        end
         
         % Only addFirst children on to the stack if this node qualifies
         if (use_self_depth_low_enough && all_children_errors_finite)
@@ -288,7 +317,7 @@ else
 end
 
 
-%% Tree of results
+% Tree of results
 % http://stackoverflow.com/questions/5065051/add-node-numbers-get-node-locations-from-matlabs-treeplot
 
 H = figure;
@@ -309,16 +338,16 @@ ee = [results(:).error_value_to_use];
 use_self_bool = ee >= USE_SELF;
 plot(x(use_self_bool), y(use_self_bool), 'r.', 'MarkerSize', 20);
 
-error_array = [results(:).self_error];
+error_array = round([results(:).self_error]);
 error_strings = cellstr(num2str(error_array'));
-std_array = [results(:).self_std];
-std_strings = cellstr(num2str(round(std_array)'));
+std_array = round([results(:).self_std]);
+std_strings = cellstr(num2str(std_array'));
 % nptsinnode_strings = cellstr(num2str((cellfun(@(x) size(x,2), GWT.PointsInNet))'));
 cp_idx_strings = cellstr(num2str((1:length(GWT.cp))'));
 
 childerr_strings = cell(length(GWT.cp),1);
 for ii = 1:length(GWT.cp),
-    childerr_strings{ii} = num2str(results(ii).direct_children_errors);
+    childerr_strings{ii} = num2str(round(results(ii).direct_children_errors));
 end
 
 % combo_strings = strcat(error_strings, '~', std_strings);
@@ -328,21 +357,23 @@ childcombo_strings = childerr_strings;
 
 besterr_strings = cell(length(GWT.cp),1);
 for ii = 1:length(GWT.cp),
-    besterr_strings{ii} = num2str(results(ii).best_children_errors);
+    besterr_strings{ii} = num2str(round(results(ii).best_children_errors));
 end
 
 % Node errors
-text(x(:,1), y(:,1), combo_strings, ...
+% Only displaying the finite values for now
+finite_values = isfinite(str2double(childerr_strings));
+text(x(finite_values,1), y(finite_values,1), combo_strings(finite_values), ...
     'VerticalAlignment','bottom','HorizontalAlignment','right')
 % Child node errors
-text(x(:,1), y(:,1), childcombo_strings, ...
+text(x(finite_values,1), y(finite_values,1), childcombo_strings(finite_values), ...
     'VerticalAlignment','top','HorizontalAlignment','right','Color',[0.6 0.2 0.2])
 % Best Child node errors
-text(x(:,1), y(:,1), besterr_strings, ...
+text(x(finite_values,1), y(finite_values,1), besterr_strings(finite_values), ...
     'VerticalAlignment','top','HorizontalAlignment','left','Color',[0.2 0.6 0.2])
 % Node cp index
-text(x(:,1), y(:,1), cp_idx_strings, ...
-    'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
+% text(x(:,1), y(:,1), cp_idx_strings, ...
+%     'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
 
-title({['LDA cross validation: ' strrep(data_set, '_', ' ') ' - ' num2str(n_pts) ' pts']}, ...
+title({['LDACV: ' num2str(ALLOWED_DEPTH) ' deep ' strrep(data_set, '_', ' ') ' - ' num2str(n_pts) ' pts']}, ...
     'Position', [0.01 1.02], 'HorizontalAlignment', 'Left', 'Margin', 10);
