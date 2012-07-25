@@ -4,9 +4,8 @@ function [n_errors, model] = lda_traintest( data_train, labels_train, data_test,
 %
 % data = [d n] array of measurements
 % labels = [1 n] array of category labels (integers)
-% 
-% (optional)
-% holdout_groups = 5 : number of groups for cross-validation
+%
+% NOTE: If there are no test points, model is returned and n_errors == 0
 %
 % Requires Will Dwinnell's LDA code
 %   http://matlabdatamining.blogspot.com/2010/12/linear-discriminant-analysis-lda.html

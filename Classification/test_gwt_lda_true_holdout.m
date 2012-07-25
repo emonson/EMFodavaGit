@@ -12,9 +12,9 @@ stream0 = RandStream('mt19937ar','Seed',2);
 RandStream.setGlobalStream(stream0);
 
 %% Go parallel
-if matlabpool('size')==0,
-    matlabpool('OPEN',6);
-end;
+% if matlabpool('size')==0,
+%     matlabpool('OPEN',6);
+% end;
 
 %% Pick a data set
 pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
@@ -64,7 +64,7 @@ groups = zero_based_groups + 1;
 % Since now including self in find should give empty if all self
 % and parents are USE_CHILDREN, and 1 if self is USE_SELF, so
 % allowed_depth should start at 1 
-ALLOWED_DEPTH = 2;
+ALLOWED_DEPTH = 6;
 
 % Flag for error status on each node
 USE_THIS = 10;
@@ -106,10 +106,10 @@ for rr = 1:m,
     Data_test = FGWT(GWT, GWT.X_test);
 
     % NOTE: Deleting some unneeded data for memory's sake
-    Data_train = rmfield(Data_train, 'Projections');
-    Data_train = rmfield(Data_train, 'TangentialCorrections');
-    Data_train = rmfield(Data_train, 'MatWavCoeffs');
-    Data_test = rmfield(Data_test, 'MatWavCoeffs');
+    % Data_train = rmfield(Data_train, 'Projections');
+    % Data_train = rmfield(Data_train, 'TangentialCorrections');
+    % Data_train = rmfield(Data_train, 'MatWavCoeffs');
+    % Data_test = rmfield(Data_test, 'MatWavCoeffs');
 
 
     %% Test holdout data split for classifier accuracy measurement

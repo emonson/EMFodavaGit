@@ -34,9 +34,12 @@ function [total_errors, model_train] = gwt_single_node_lda_traintest( GWT, Data_
 
     % Run
     % Must have more than one training point and category to make a
-    % reasonable model, but can get by with only a single test point
+    % reasonable model.
     if (node_cats_train > 1 && node_pts_train > 1 && node_cats_test >= 1 && node_pts_test >= 1),
         [total_errors, model_train] = lda_traintest( coeffs_train, dataLabels_train, coeffs_test, dataLabels_test );
+    elseif (node_cats_train > 1 && node_pts_train > 1 && node_cats_test == 0 && node_pts_test == 0),
+        total_errors = 0;
+        model_train = lda_modelonly( coeffs_train, dataLabels_train );
     else
         total_errors = inf;
         % NOTE: Not sure this is the right choice for "no model"...
