@@ -83,6 +83,12 @@ L = [ones(n_labels_test,1) sub_meas_test'] * model';
 
 [~,I] = max(L,[],2);
 
-n_errors = sum(un_cats_train(I) ~= sub_cats_test) + pre_errors;
+n_errors = pre_errors;
+
+% If all test categories weren't in training model, then already have all
+% of the errors because sub_cats_test is empty.
+if ~isempty(sub_cats_test),
+    n_errors = n_errors + sum(un_cats_train(I) ~= sub_cats_test);
+end
 
 end

@@ -25,7 +25,7 @@ function [total_errors, model_train] = gwt_single_node_lda_traintest( GWT, Data_
     else
         coeffs_test = cat(2, cat(1, Data_test.CelScalCoeffs{Data_test.Cel_cpidx == current_node_idx}), cat(1,Data_test.CelWavCoeffs{Data_test.Cel_cpidx == current_node_idx}))';
     end
-    % NOTE: Non-parallel data structures for train and test
+    % NOTE: Non-parallel input data structures for train and test
     dataIdxs_test = Data_test.PointsInNet{current_node_idx};
     dataLabels_test = imgOpts.Labels_test(dataIdxs_test);
 
@@ -33,7 +33,9 @@ function [total_errors, model_train] = gwt_single_node_lda_traintest( GWT, Data_
     node_cats_test = length(unique(dataLabels_test));
 
     % Run
-    if (node_cats_train > 1 && node_pts_train > 1 && node_cats_test > 1 && node_pts_test > 1),
+    % Must have more than one training point and category to make a
+    % reasonable model, but can get by with only a single test point
+    if (node_cats_train > 1 && node_pts_train > 1 && node_cats_test >= 1 && node_pts_test >= 1),
         [total_errors, model_train] = lda_traintest( coeffs_train, dataLabels_train, coeffs_test, dataLabels_test );
     else
         total_errors = inf;
