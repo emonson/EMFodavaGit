@@ -82,16 +82,14 @@ switch pExampleName
     if dataset.projectionDimension > 0 && dataset.projectionDimension < imgOpts.imR*imgOpts.imC,
         imgOpts.X0 = X0;
         imgOpts.cm = mean(X0,2);
-        X = X0 - repmat(imgOpts.cm,1,dataset.N);
+        X = X0 - repmat(imgOpts.cm, 1, size(X0,2));
         %     [U,S,V] = svd(X,0);
         [U,S,V] = randPCA(X,dataset.projectionDimension);
-        X = U.*repmat(diag(S)', dataset.N, 1);
-        GWTopts.errorType = 'absolute';
-        imgOpts.V = U;
+        X = S*V';
+        imgOpts.U = U;
         imgOpts.isCompressed = true;
     else
-        X = X0; 
-        clear('X0');
+        X = X0; clear X0;
         imgOpts.isCompressed = false;
     end;
 
@@ -99,7 +97,7 @@ switch pExampleName
     %GWTopts.ManifoldDimension = 4; % if 0, then determine locally adaptive dimensions using the following fields:
     GWTopts.threshold0 = 0.5; % threshold for choosing pca dimension at each nonleaf node
     GWTopts.errorType = 'relative';
-    GWTopts.precision  = .05; % only for leaf nodes
+    GWTopts.precision  = .050; % only for leaf nodes
 
   case 'Medical12images'
 
@@ -461,7 +459,61 @@ switch pExampleName
     % leaf nodes
     GWTopts.avoidLeafnodePhi = false;
 
-   case 'ScienceNewsTFIDF'
+  case 'ScienceNewsDefaultParams'
+
+    load X20
+
+    classes_orig = classes;
+    classes(classes_orig(:,1)==0,:) = [];
+
+    ff = fopen('sn_titles.txt');
+    xx = textscan(ff, '%f%s', 'Delimiter', '\t');
+    fclose(ff);
+
+    file_names = xx{1};
+    titles_orig = xx{2};
+
+    ii = 1;
+    titles = cell(size(classes(:,2)));
+
+    for tt = classes(:,2)',
+        titles{ii} = titles_orig{file_names == tt};
+        ii = ii + 1;
+    end
+
+    fid = fopen('sn_LabelsMeaning.txt');
+    articlegroups = textscan(fid,'%d = %s', 'Delimiter', '' );
+    fclose(fid);
+
+    X(classes_orig(:,1)==0,:) = [];
+    X = X';
+    
+    imgOpts.hasLabels = true;
+    imgOpts.hasLabelMeanings = true;
+    imgOpts.hasLabelSetNames = true;
+    imgOpts.hasDocTitles = true;
+    imgOpts.hasDocFileNames = true;
+
+    imgOpts.DocTitles = titles;
+    imgOpts.Terms = dict;
+    imgOpts.Labels = classes(:,1)';
+    imgOpts.DocFileNames = classes(:,2);
+    imgOpts.LabelMeanings = articlegroups{2}';
+    imgOpts.LabelSetNames = {'scientific discipline'};
+    imgOpts.isTextData = true;
+    
+    % DEBUG: Exclude some outliers
+    outliers = [358, 672, 731, 861];
+    X(:,outliers) = [];
+    imgOpts.Labels(outliers) = [];
+    imgOpts.DocTitles(outliers) = [];
+    imgOpts.DocFileNames(outliers) = [];
+
+    GWTopts.threshold0 = 0.5;
+    GWTopts.errorType = 'absolute';
+    GWTopts.precision  = 1e-2; % only for leaf nodes
+
+  case 'ScienceNewsTFIDF'
 
     load X20
 

@@ -18,6 +18,7 @@ RandStream.setGlobalStream(stream0);
 
 %% Pick a data set
 pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
+                  'ScienceNewsDefaultParams', ...
                   'Medical12images','Medical12Sift','CorelImages','CorelSift', ...
                   'Olivetti_faces', ...
                   '20NewsAllTrain', '20NewsAllTest', '20NewsAllCombo', ...
@@ -36,6 +37,7 @@ pGWTversion = 0;
 
 % Generate data and choose parameters for GWT
 [X, GWTopts, imgOpts] = EMo_GenerateData_and_SetParameters(pExampleNames{pExampleIdx});
+fprintf(1, '\n\n');
 GWTopts.GWTversion = pGWTversion;
 
 % Make an external copy that will copy from for holdout groups along with X
@@ -72,6 +74,8 @@ USE_SELF = 1;
 USE_CHILDREN = -1;
 UNDECIDED = -10;
 
+LDA_DIM_LIMIT = 70;
+
 results_cell = cell(m, 1);
 results_holdout_cell = cell(m, 1);
 
@@ -83,11 +87,42 @@ for rr = 1:m,
     X_test = X(:,groups == rr);
     imgOpts.Labels_train = Labels(groups ~= rr);
     imgOpts.Labels_test = Labels(groups == rr);
+    
+    %% Do straight LDA on all the data, possibly with reduced dimensionality
+    
+    % Dimensionality into which to project data for straight LDA (0 = no dim reduction)
+    if size(X_train,1) > LDA_DIM_LIMIT,
+        straight_lda_dim = LDA_DIM_LIMIT;
+        % Dim must be smaller than number of points
+        if size(X_train,2) < straight_lda_dim,
+            straight_lda_dim = size(X_train,2) - 1;
+        end
+    else
+        straight_lda_dim = 0;
+    end
+    
+    if ((straight_lda_dim > 0) && (straight_lda_dim < size(X_train,1))),
+        X0 = X_train;
+        cm = mean(X0,2);
+        X1 = X0 - repmat(cm, 1, size(X0,2));
+        clear('X0');
+        fprintf('pre-LDA randPCA from %d to %d dimensions\n', size(X1,1), straight_lda_dim);
+        % NOTE: randPCA calls RAND
+        [~,S,V] = randPCA(X1, straight_lda_dim);
+        X_lda = S*V';
+        clear('X1', 'S', 'V');
+    else
+        X_lda = X_train;
+    end;
+    
+    fprintf(1, 'Straight LDA in %d dim\n', straight_lda_dim);
+    [straight_lda_error, straight_lda_std] = lda_multi_crossvalidation(X_lda, imgOpts.Labels_train);
+    clear('X_lda');
 
     %% Generate GWT
 
     % Construct geometric wavelets
-    fprintf(1, '\nGMRA, Group %d / %d\n', rr, m);
+    fprintf(1, 'GMRA, Group %d / %d\n', rr, m);
     GWT = GMRA(X_train, GWTopts);
 
     % Getting rid of GWT.X to make sure train/test code isn't screwed up...
@@ -122,7 +157,7 @@ for rr = 1:m,
 
     % Combined uses both scaling functions and wavelets together for all fine
     % scales. Otherwise, only scaling functions are used for all scales.
-    COMBINED = false;
+    COMBINED = true;
 
     results = struct();
 
@@ -659,32 +694,41 @@ for rr = 1:m,
     end
 
     % Only displaying the finite values for now
-    finite_values = isfinite(str2double(combo_strings));
-    finite_holdout_vals = isfinite(str2double(holderr_strings));
+    finite_errors = isfinite(str2double(combo_strings));
+    finite_childerr = isfinite(str2double(childcombo_strings));
+    finite_besterr = isfinite(str2double(besterr_strings));
 
     % Node errors
-    text(x(finite_values), y(finite_values)+0.01, combo_strings(finite_values), ...
+    text(x(finite_errors), y(finite_errors)+0.01, combo_strings(finite_errors), ...
         'VerticalAlignment','bottom','HorizontalAlignment','right','Color', [0.2 0.2 0.2]);
     % Child node errors
-    text(x(finite_values), y(finite_values), childcombo_strings(finite_values), ...
+    text(x(finite_childerr), y(finite_childerr), childcombo_strings(finite_childerr), ...
         'VerticalAlignment','middle','HorizontalAlignment','right','Color', [0.4 0.2 0.2])
     % Best Child node errors
-    text(x(finite_values), y(finite_values)-0.01, besterr_strings(finite_values), ...
+    text(x(finite_besterr), y(finite_besterr)-0.01, besterr_strings(finite_besterr), ...
         'VerticalAlignment','top','HorizontalAlignment','right','Color', [0.2 0.4 0.2]);
+
+    % Straight LDA error on training data
+    text(x(end), y(end)+0.04, [num2str(round(straight_lda_error)) '·' num2str(straight_lda_dim)], ...
+        'VerticalAlignment','bottom','HorizontalAlignment','right','Color', [0.2 0.2 0.4]);
+
     % Node cp index
     % text(x(:,1), y(:,1), cp_idx_strings, ...
     %     'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
     
+    finite_holderr = isfinite(str2double(holderr_strings));
+    finite_childholderr = isfinite(str2double(childholderr_strings));
+    finite_bestholderr = isfinite(str2double(bestholderr_strings));
+
     % Holdout error
-    text(x(finite_holdout_vals), y(finite_holdout_vals)+0.01, holderr_strings(finite_holdout_vals), ...
+    text(x(finite_holderr), y(finite_holderr)+0.01, holderr_strings(finite_holderr), ...
         'VerticalAlignment','bottom','HorizontalAlignment','left','Color', [0.2 0.2 0.2]);
     % Child holdout node errors
-    text(x(finite_holdout_vals), y(finite_holdout_vals), childholderr_strings(finite_holdout_vals), ...
+    text(x(finite_childholderr), y(finite_childholderr), childholderr_strings(finite_childholderr), ...
         'VerticalAlignment','middle','HorizontalAlignment','left','Color', [0.4 0.2 0.2])
     % Best Holdout child error
-    text(x(finite_holdout_vals), y(finite_holdout_vals)-0.01, bestholderr_strings(finite_holdout_vals), ...
+    text(x(finite_bestholderr), y(finite_bestholderr)-0.01, bestholderr_strings(finite_bestholderr), ...
         'VerticalAlignment','top','HorizontalAlignment','left','Color', [0.2 0.4 0.2]);
-
 
     title({['LDACV: ' num2str(ALLOWED_DEPTH) ' deep ' strrep(data_set, '_', ' ') ' - ' num2str(n_pts_train) ' / ' num2str(length(imgOpts.Labels_test)) ' pts']}, ...
         'Position', [0.01 1.02], 'HorizontalAlignment', 'Left', 'Margin', 10);
