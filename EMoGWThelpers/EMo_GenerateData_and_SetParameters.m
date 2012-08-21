@@ -1,4 +1,4 @@
-function [X, GWTopts, imgOpts] = GenerateData_and_SetParameters(pExampleName)
+function [X, GWTopts, imgOpts] = EMo_GenerateData_and_SetParameters(pExampleName)
 
 %% set GWT parameters
 GWTopts = struct();

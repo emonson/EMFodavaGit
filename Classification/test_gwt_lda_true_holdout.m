@@ -66,7 +66,7 @@ groups = zero_based_groups + 1;
 % Since now including self in find should give empty if all self
 % and parents are USE_CHILDREN, and 1 if self is USE_SELF, so
 % allowed_depth should start at 1 
-ALLOWED_DEPTH = 6;
+ALLOWED_DEPTH = 2;
 
 % Flag for error status on each node
 USE_THIS = 10;
@@ -74,7 +74,7 @@ USE_SELF = 1;
 USE_CHILDREN = -1;
 UNDECIDED = -10;
 
-LDA_DIM_LIMIT = 70;
+LDA_DIM_LIMIT = 100;
 
 results_cell = cell(m, 1);
 results_holdout_cell = cell(m, 1);
@@ -157,7 +157,7 @@ for rr = 1:m,
 
     % Combined uses both scaling functions and wavelets together for all fine
     % scales. Otherwise, only scaling functions are used for all scales.
-    COMBINED = true;
+    COMBINED = false;
 
     results = struct();
 
