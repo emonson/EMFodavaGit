@@ -44,6 +44,7 @@ n_dim_trials = length(dim_limit);
 errors = zeros(n_dim_trials, 1);
 dims = zeros(n_dim_trials, 1);
 stds = zeros(n_dim_trials, 1);
+complexity = zeros(n_dim_trials, 1);
 
 % Outer loop over holdout groups
 for ii = 1:n_dim_trials,
@@ -76,15 +77,16 @@ for ii = 1:n_dim_trials,
     fprintf(1, 'Straight LDA in %d dim\n', straight_lda_dim);
     [errors(ii), stds(ii)] = lda_multi_crossvalidation(X_lda, imgOpts.Labels);
     dims(ii) = size(X_lda, 1);
+    complexity(ii) = length(unique(imgOpts.Labels)) * dims(ii)^2;
     % clear('X_lda');
 
 end
 
 figure;
-semilogx(dims, errors, 'r.-');
+semilogx(complexity, errors, 'r.-');
 ylim([0 1.1*max(errors)]);
 title(['PCA-LDA-CV: ' strrep(pExampleNames{pExampleIdx}, '_', ' ') ' - ' num2str(size(X,2)) ' pts'], ...
     'Position', [1 1.11*max(errors)], 'HorizontalAlignment', 'Left', 'Margin', 10);
-xlabel('dimensionality');
+xlabel('complexity');
 ylabel('average errors (10 trials of 5 holdout group crossvalidation)');
 

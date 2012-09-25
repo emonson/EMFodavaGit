@@ -17,7 +17,7 @@ RandStream.setGlobalStream(stream0);
 % end;
 
 %% Pick a data set
-pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
+pExampleNames  = {'MNIST_Digits_Full', 'MNIST_Digits_Subset','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
                   'ScienceNewsDefaultParams', ...
                   'Medical12images','Medical12Sift','CorelImages','CorelSift', ...
                   'Olivetti_faces', ...
@@ -63,9 +63,11 @@ zero_based_groups = mod(random_indices, m);
 % But group labels are 1-based
 groups = zero_based_groups + 1;
 
-% Since now including self in find should give empty if all self
-% and parents are USE_CHILDREN, and 1 if self is USE_SELF, so
-% allowed_depth should start at 1 
+% This parameter sets the depth down in the GWT tree that will be searched
+% past the point at which using the children is worse than using the node
+% itself. DEPTH = 0 will stop immediately when children don't help. 
+% DEPTH = 2 will look down 2 levels to see if it can do better. I usually
+% set to 6 or 10 to search most of the tree.
 ALLOWED_DEPTH = 2;
 
 % Flag for error status on each node
@@ -117,6 +119,7 @@ for rr = 1:m,
     
     fprintf(1, 'Straight LDA in %d dim\n', straight_lda_dim);
     [straight_lda_error, straight_lda_std] = lda_multi_crossvalidation(X_lda, imgOpts.Labels_train);
+    straight_lda_complexity = length(unique(imgOpts.Labels_train)) * straight_lda_dim^2;
     clear('X_lda');
 
     %% Generate GWT
@@ -147,7 +150,7 @@ for rr = 1:m,
     % Data_test = rmfield(Data_test, 'MatWavCoeffs');
 
 
-    %% Test holdout data split for classifier accuracy measurement
+    %% Build model with train data split by cross-validation
 
     fprintf(1, 'LDA\n');
 
@@ -361,7 +364,8 @@ for rr = 1:m,
         end
     end
 
-    %% Now go through tree and get full model from training points and test
+    %% Now go through tree using training model
+    %   but use test data split and find best model (nodes) for that data
 
     results_holdout = struct();
 
@@ -557,7 +561,7 @@ for rr = 1:m,
         end
     end
     
-    %% Only evaluate the held-out points at the crossvalidation winner nodes
+    %% Only evaluate the held-out points on the training crossvalidation winner model (nodes)
     
     % Traverse the tree and mark the winner nodes from the cross-validation
     
@@ -569,7 +573,9 @@ for rr = 1:m,
     node_idxs.addFirst(root_idx);
     
     % Keep track of the total holdout errors at "optimal" scales
-    total_holdout_error = 0;
+    total_optimal_holdout_data_error = 0;
+    % Keep track of the sum of node "complexities" (#cats * dim(node)^2)
+    total_optimal_complexity = 0;
 
     % Main loop to work iteratively down the tree depth first
     while (~node_idxs.isEmpty())
@@ -581,7 +587,9 @@ for rr = 1:m,
         if (results(current_node_idx).error_value_to_use == USE_SELF)
             results(current_node_idx).error_value_to_use = USE_THIS;
             holdout_error = gwt_single_node_lda_traintest( GWT, Data_train, Data_test, imgOpts, current_node_idx, COMBINED );
-            total_holdout_error = total_holdout_error + holdout_error;
+            node_complexity = gwt_single_node_complexity( GWT, Data_train, imgOpts, current_node_idx, COMBINED );
+            total_optimal_holdout_data_error = total_optimal_holdout_data_error + holdout_error;
+            total_optimal_complexity = total_optimal_complexity + node_complexity;
         else
             % Get children of the current node
             current_children_idxs = find(tree_parent_idxs == current_node_idx);
@@ -595,7 +603,9 @@ for rr = 1:m,
         end
     end
 
-    %% Just for visualization, mark optimal hold-out data winner nodes
+    %% For visualization, mark optimal hold-out test data winner nodes
+    %   but at the same time sum up training error on this optimal test
+    %   model
     
     % Traverse the tree and mark the winner nodes from the cross-validation
     
@@ -606,6 +616,9 @@ for rr = 1:m,
     node_idxs = java.util.ArrayDeque();
     node_idxs.addFirst(root_idx);
 
+    % Keep track of the total training data errors at "optimal" holdout data scales
+    total_holdout_model_train_data_err = 0;
+
     % Main loop to work iteratively down the tree depth first
     while (~node_idxs.isEmpty())
         current_node_idx = node_idxs.removeFirst();
@@ -615,6 +628,7 @@ for rr = 1:m,
         % Set flag if this is the deepest node to use
         if (results_holdout(current_node_idx).error_value_to_use == USE_SELF)
             results_holdout(current_node_idx).error_value_to_use = USE_THIS;
+            total_holdout_model_train_data_err = total_holdout_model_train_data_err + results(current_node_idx).self_error;
         else
             % Get children of the current node
             current_children_idxs = find(tree_parent_idxs == current_node_idx);
@@ -708,8 +722,13 @@ for rr = 1:m,
     text(x(finite_besterr), y(finite_besterr)-0.01, besterr_strings(finite_besterr), ...
         'VerticalAlignment','top','HorizontalAlignment','right','Color', [0.2 0.4 0.2]);
 
+    % Total training data error at "optimal" holdout data scales + orig
+    % model "complexity"
+    text(x(end), y(end)-0.04, [num2str(round(total_holdout_model_train_data_err)) '·' num2str(total_optimal_complexity)], ...
+        'VerticalAlignment','top','HorizontalAlignment','right','Color', [0.2 0.2 0.4]);
+    
     % Straight LDA error on training data
-    text(x(end), y(end)+0.04, [num2str(round(straight_lda_error)) '·' num2str(straight_lda_dim)], ...
+    text(x(end), y(end)+0.04, [num2str(round(straight_lda_error)) '·' num2str(straight_lda_dim) '·' num2str(straight_lda_complexity)], ...
         'VerticalAlignment','bottom','HorizontalAlignment','right','Color', [0.2 0.2 0.4]);
 
     % Node cp index
@@ -734,7 +753,7 @@ for rr = 1:m,
         'Position', [0.01 1.02], 'HorizontalAlignment', 'Left', 'Margin', 10);
     
     % Total holdout error at "optimal" scales
-    text(x(end), y(end)-0.04, num2str(total_holdout_error), ...
+    text(x(end), y(end)-0.04, num2str(total_optimal_holdout_data_error), ...
         'VerticalAlignment','top','HorizontalAlignment','left','Color', [0.2 0.2 0.4]);
     
     % Refresh plots mid-loop

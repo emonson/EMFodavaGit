@@ -55,12 +55,56 @@ imgOpts.hasDocFileNames = false;
 fprintf('\nGenerating/loading %s data...', pExampleName);tic
 switch pExampleName
 
-  case 'MNIST_Digits'
+  case 'MNIST_Digits_Full'
+
+    % generate the dataset
+    dataset = struct();
+    dataset.N = 5000;
+    dataset.digits = [1 2 3 4 5 6 7 8 9 0];
+    dataset.projectionDimension = 0;
+
+    [X0,GraphDiffOpts,NetsOpts,Labels] = GenerateDataSets( 'BMark_MNIST', ...
+        struct('NumberOfPoints',dataset.N,'AutotuneScales',false,'MnistOpts',struct('Sampling', 'FirstN', 'QueryDigits',dataset.digits, 'ReturnForm', 'vector'))); %#ok<ASGLU>
+
+    % Rotate images for GUI
+    yy = reshape(X0,28,28,[]);
+    yy1 = permute(yy,[2 1 3]);
+    yy2 = flipdim(yy1,2);
+    X0 = reshape(yy2,784,[]);
+    clear('yy','yy1','yy2');
+
+    % image parameters
+    imgOpts.imageData = true;
+    imgOpts.imR = 28;
+    imgOpts.imC = 28;
+    imgOpts.Labels = Labels'; % Should be nCats x nPoints
+
+    if dataset.projectionDimension > 0 && dataset.projectionDimension < imgOpts.imR*imgOpts.imC,
+        imgOpts.X0 = X0;
+        imgOpts.cm = mean(X0,2);
+        X = X0 - repmat(imgOpts.cm, 1, size(X0,2));
+        %     [U,S,V] = svd(X,0);
+        [U,S,V] = randPCA(X,dataset.projectionDimension);
+        X = S*V';
+        imgOpts.U = U;
+        imgOpts.isCompressed = true;
+    else
+        X = X0; clear X0;
+        imgOpts.isCompressed = false;
+    end;
+
+    % GWT parameters that need to be set separately
+    %GWTopts.ManifoldDimension = 4; % if 0, then determine locally adaptive dimensions using the following fields:
+    GWTopts.threshold0 = 0.5; % threshold for choosing pca dimension at each nonleaf node
+    GWTopts.errorType = 'relative';
+    GWTopts.precision  = .050; % only for leaf nodes
+
+  case 'MNIST_Digits_Subset'
 
     % generate the dataset
     dataset = struct();
     dataset.N = 2000;
-    dataset.digits = [1 2 3 4 5 6 7 8 9 0];
+    dataset.digits = [1 2 3];
     dataset.projectionDimension = 0;
 
     [X0,GraphDiffOpts,NetsOpts,Labels] = GenerateDataSets( 'BMark_MNIST', ...
@@ -449,7 +493,7 @@ switch pExampleName
     GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
 
     GWTopts.errorType = 'relative';
-    GWTopts.threshold0 = [0.85 0.75]; % threshold for choosing pca dimension at each nonleaf node
+    GWTopts.threshold0 = 0.6; % [0.85 0.75]; % threshold for choosing pca dimension at each nonleaf node
     GWTopts.precision  = 0.001; % only for leaf nodes
 
     GWTopts.coeffs_threshold = 0;
@@ -757,7 +801,7 @@ case '20NewsAllTest'
     GWTopts.ManifoldDimension = 0; % if 0, then determine locally adaptive dimensions using the following fields:
 
     GWTopts.errorType = 'relative';
-    GWTopts.threshold0 = [0.9 0.8]; % threshold for choosing pca dimension at each nonleaf node
+    GWTopts.threshold0 = 0.1; % [0.9 0.8]; % threshold for choosing pca dimension at each nonleaf node
     GWTopts.precision  = 0.001; % only for leaf nodes
 
     GWTopts.coeffs_threshold = 0;
