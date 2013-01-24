@@ -103,7 +103,7 @@ switch pExampleName
 
     % generate the dataset
     dataset = struct();
-    dataset.N = 2000;
+    dataset.N = 1000;
     dataset.digits = [1 2 3];
     dataset.projectionDimension = 0;
 

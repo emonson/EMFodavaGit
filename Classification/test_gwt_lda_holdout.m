@@ -11,7 +11,7 @@ if matlabpool('size')==0,
 end;
 
 %% Pick a data set
-pExampleNames  = {'MNIST_Digits','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
+pExampleNames  = {'MNIST_Digits_Full', 'MNIST_Digits_Subset','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
                   'Medical12images','Medical12Sift','CorelImages','CorelSift', ...
                   'Olivetti_faces', ...
                   '20NewsAllTrain', '20NewsAllTest', '20NewsAllCombo', ...
@@ -46,7 +46,9 @@ fprintf(1, 'GWT Training Data\n\n');
 % Deleting some unneeded data for memory's sake
 % Data = rmfield(Data,'Projections');
 % Data = rmfield(Data,'TangentialCorrections');
-Data = rmfield(Data,'MatWavCoeffs');
+if isfield(Data, 'MatWavCoeffs'),
+    Data = rmfield(Data,'MatWavCoeffs');
+end
 
 %% Test original data
 
