@@ -261,12 +261,13 @@ switch pExampleName
     [imR,imC,c] = size(tmp);
     imC = 3*imC;
 
+    N = length(filenames);
     dataset = struct();
-    dataset.N = length(filenames);
+    dataset.N = N;
     dataset.projectionDimension = 0;
 
-    X0 = zeros(imR*imC, length(filenames));
-    for ii = 1:length(filenames),
+    X0 = zeros(imR*imC, N);
+    for ii = 1:N,
         tmp = imread(filenames{ii});
         [r,c,cc] = size(tmp);
         if (r < c),

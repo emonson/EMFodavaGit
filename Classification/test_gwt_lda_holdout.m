@@ -6,9 +6,9 @@ stream0 = RandStream('mt19937ar','Seed',2);
 RandStream.setGlobalStream(stream0);
 
 %% Go parallel
-if matlabpool('size')==0,
-    matlabpool('OPEN',6);
-end;
+% if matlabpool('size')==0,
+%     matlabpool('OPEN',6);
+% end;
 
 %% Pick a data set
 pExampleNames  = {'MNIST_Digits_Full', 'MNIST_Digits_Subset','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
@@ -154,7 +154,7 @@ if (length(root_idx) > 1)
 else
     % This routine calculates errors for the children of the current node
     % so we need to first calculate the root node error
-    [total_errors, std_errors] = gwt_single_node_lda_crossvalidation( GWT, Data, imgOpts, root_idx, COMBINED );
+    [total_errors, std_errors] = gwt_single_node_lda_crossvalidation( GWT, Data, imgOpts.Labels, root_idx, COMBINED );
 
     % Record the results for the root node
     results(root_idx).self_error = total_errors;
@@ -192,7 +192,7 @@ else
         for current_child_idx = current_children_idxs,
 
             % Calculate the error on the current child
-            [total_errors, std_errors] = gwt_single_node_lda_crossvalidation( GWT, Data, imgOpts, current_child_idx, COMBINED );
+            [total_errors, std_errors] = gwt_single_node_lda_crossvalidation( GWT, Data, imgOpts.Labels, current_child_idx, COMBINED );
 
             % Record the results for the current child
             results(current_child_idx).self_error = total_errors;
