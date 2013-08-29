@@ -1,4 +1,4 @@
-function [n_errors, model] = lda_traintest( data_train, labels_train, data_test, labels_test, varargin )
+function [n_errors, model,labels_pred] = lda_traintest( data_train, labels_train, data_test, labels_test, varargin )
 
 % Cross-validation (1/5 holdout for now) of Linear Discriminant Analysis
 %
@@ -36,7 +36,7 @@ function [n_errors, model] = lda_traintest( data_train, labels_train, data_test,
 
 % Need value to be an integer, but isinteger() tests for int array...
 checkDigitsArray = @(x) allintarray(x);
-    
+
 p = inputParser;
 
 % NOTE: These have to be added in the arglist order!!
@@ -82,12 +82,14 @@ L = [ones(n_labels_test,1) sub_meas_test'] * model';
 
 [~,I] = max(L,[],2);
 
+labels_pred = I;
+
 n_errors = pre_errors;
 
 % If all test categories weren't in training model, then already have all
 % of the errors because sub_cats_test is empty.
-if ~isempty(sub_cats_test),
-    n_errors = n_errors + sum(un_cats_train(I) ~= sub_cats_test);
-end
+%if ~isempty(sub_cats_test),
+n_errors = n_errors + sum(un_cats_train(I') ~= sub_cats_test);
+%end
 
 end

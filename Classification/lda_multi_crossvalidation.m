@@ -96,6 +96,9 @@ if n_labels >= m,
             % P = exp(L) ./ repmat(sum(exp(L),2),[1 size(L,2)]);
 
             [~,I] = max(L,[],2);
+            
+            %figure;scatter(meas_test(1,:),meas_test(2,:),20,I,'filled');
+            
             errors_array(rr) = sum(un_cats(I) ~= labels_test);
         end
         iter_errors(iter) = sum(errors_array);
