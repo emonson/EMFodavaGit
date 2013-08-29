@@ -12,9 +12,9 @@ stream0 = RandStream('mt19937ar','Seed',2);
 RandStream.setGlobalStream(stream0);
 
 %% Go parallel
-% if matlabpool('size')==0,
-%     matlabpool('OPEN',6);
-% end;
+if matlabpool('size')==0,
+    matlabpool('OPEN',6);
+end;
 
 %% Pick a data set
 pExampleNames  = {'MNIST_Digits_Full', 'MNIST_Digits_Subset','YaleB_Faces','croppedYaleB_Faces','ScienceNews', ...
