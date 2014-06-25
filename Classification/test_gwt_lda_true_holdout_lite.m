@@ -602,46 +602,6 @@ for rr = 1:m,
             end
         end
     end
-
-    %% For visualization, mark optimal hold-out test data winner nodes
-    %   but at the same time sum up training error on this optimal test
-    %   model
-    
-    % Traverse the tree and mark the winner nodes from the cross-validation
-    
-    % The java deque works with First = most recent, Last = oldest
-    %   so since it can be accessed with removeFirst / removeLast
-    %   it can be used either as a LIFO stack or FIFO queue
-    % Here I'm trying it as a stack to do a depth-first tree traversal
-    node_idxs = java.util.ArrayDeque();
-    node_idxs.addFirst(root_idx);
-
-    % Keep track of the total training data errors at "optimal" holdout data scales
-    total_holdout_model_train_data_err = 0;
-
-    % Main loop to work iteratively down the tree depth first
-    while (~node_idxs.isEmpty())
-        current_node_idx = node_idxs.removeFirst();
-        % DEBUG
-        % fprintf( 'current node: %d\n', current_node_idx );
-        
-        % Set flag if this is the deepest node to use
-        if (results_holdout(current_node_idx).error_value_to_use == USE_SELF)
-            results_holdout(current_node_idx).error_value_to_use = USE_THIS;
-            total_holdout_model_train_data_err = total_holdout_model_train_data_err + results(current_node_idx).self_error;
-        else
-            % Get children of the current node
-            current_children_idxs = find(tree_parent_idxs == current_node_idx);
-
-            % and put them in the stack for further traversal
-            for idx = current_children_idxs
-                node_idxs.addFirst(idx);
-                % DEBUG
-                % fprintf(' + +   adding: %d\n', idx);
-            end
-        end
-    end
-
     
     %% Tree of results
     % http://stackoverflow.com/questions/5065051/add-node-numbers-get-node-locations-from-matlabs-treeplot
@@ -666,10 +626,6 @@ for rr = 1:m,
     use_self_bool = ee == USE_THIS;
     plot(x(use_self_bool), y(use_self_bool), '.', 'MarkerSize', 20, 'Color', [0.8 0.5 0.5]);
 
-    ee_h = [results_holdout(:).error_value_to_use];
-    h_use_self_bool = ee_h == USE_THIS;
-    plot(x(h_use_self_bool), y(h_use_self_bool), 'o', 'MarkerSize', 10, 'Color', [0.8 0.5 0.5]);
-
     error_array = round([results(:).self_error]);
     error_strings = cellstr(num2str(error_array'));
     std_array = round([results(:).self_std]);
@@ -692,21 +648,6 @@ for rr = 1:m,
         besterr_strings{ii} = num2str(round(results(ii).best_children_errors));
     end
 
-    holderr_strings = cell(length(GWT.cp),1);
-    for ii = 1:length(GWT.cp),
-        holderr_strings{ii} = num2str(round(results_holdout(ii).self_error));
-    end
-
-    childholderr_strings = cell(length(GWT.cp),1);
-    for ii = 1:length(GWT.cp),
-        childholderr_strings{ii} = num2str(round(results_holdout(ii).direct_children_errors));
-    end
-
-    bestholderr_strings = cell(length(GWT.cp),1);
-    for ii = 1:length(GWT.cp),
-        bestholderr_strings{ii} = num2str(round(results_holdout(ii).best_children_errors));
-    end
-
     % Only displaying the finite values for now
     finite_errors = isfinite(str2double(combo_strings));
     finite_childerr = isfinite(str2double(childcombo_strings));
@@ -722,32 +663,9 @@ for rr = 1:m,
     text(x(finite_besterr), y(finite_besterr)-0.01, besterr_strings(finite_besterr), ...
         'VerticalAlignment','top','HorizontalAlignment','right','Color', [0.2 0.4 0.2]);
 
-    % Total training data error at "optimal" holdout data scales + orig
-    % model "complexity"
-    text(x(end), y(end)-0.04, [num2str(round(total_holdout_model_train_data_err)) '·' num2str(total_optimal_complexity)], ...
-        'VerticalAlignment','top','HorizontalAlignment','right','Color', [0.2 0.2 0.4]);
-    
     % Straight LDA error on training data
     text(x(end), y(end)+0.04, [num2str(round(straight_lda_error)) '·' num2str(straight_lda_dim) '·' num2str(straight_lda_complexity)], ...
         'VerticalAlignment','bottom','HorizontalAlignment','right','Color', [0.2 0.2 0.4]);
-
-    % Node cp index
-    % text(x(:,1), y(:,1), cp_idx_strings, ...
-    %     'VerticalAlignment','bottom','HorizontalAlignment','left','Color',[0.2 0.2 0.6])
-    
-    finite_holderr = isfinite(str2double(holderr_strings));
-    finite_childholderr = isfinite(str2double(childholderr_strings));
-    finite_bestholderr = isfinite(str2double(bestholderr_strings));
-
-    % Holdout error
-    text(x(finite_holderr), y(finite_holderr)+0.01, holderr_strings(finite_holderr), ...
-        'VerticalAlignment','bottom','HorizontalAlignment','left','Color', [0.2 0.2 0.2]);
-    % Child holdout node errors
-    text(x(finite_childholderr), y(finite_childholderr), childholderr_strings(finite_childholderr), ...
-        'VerticalAlignment','middle','HorizontalAlignment','left','Color', [0.4 0.2 0.2])
-    % Best Holdout child error
-    text(x(finite_bestholderr), y(finite_bestholderr)-0.01, bestholderr_strings(finite_bestholderr), ...
-        'VerticalAlignment','top','HorizontalAlignment','left','Color', [0.2 0.4 0.2]);
 
     title({['LDACV: ' num2str(ALLOWED_DEPTH) ' deep ' strrep(data_set, '_', ' ') ' - ' num2str(n_pts_train) ' / ' num2str(length(imgOpts.Labels_test)) ' pts']}, ...
         'Position', [0.01 1.02], 'HorizontalAlignment', 'Left', 'Margin', 10);

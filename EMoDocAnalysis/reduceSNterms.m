@@ -36,7 +36,7 @@ tdm = tdm(:,classes(:,2)-10000+1);
 %    tdm2(:,ii) = tdm2(:,ii)/sum1(ii); 
 % end
 
-% Alternative starting point when not only keeping frequent terms
+%% Alternative starting point when not only keeping frequent terms
 tdm2 = tdm;
 terms2 = terms;
 
