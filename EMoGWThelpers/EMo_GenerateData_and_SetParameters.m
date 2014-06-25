@@ -435,7 +435,8 @@ switch pExampleName
 
   case 'ScienceNews'
 
-    load X20
+    cd('/Users/emonson/Data/Fodava/MauroDocAnalysis/Data');
+      load X20
 
     classes_orig = classes;
     classes(classes_orig(:,1)==0,:) = [];
@@ -455,7 +456,7 @@ switch pExampleName
         ii = ii + 1;
     end
 
-    fid = fopen('sn_LabelsMeaning.txt');
+    fid = fopen('LabelsMeaning.txt');
     articlegroups = textscan(fid,'%d = %s', 'Delimiter', '' );
     fclose(fid);
 
@@ -866,6 +867,7 @@ case '20NewsAllCombo'
 case '20NewsSubset1'
 
     load('/Users/emonson/Data/Fodava/EMoDocMatlabData/n20_sub1train_TFcorr_111809.mat');
+    % load('/Users/emonson/Data/Fodava/EMoDocMatlabData/n20_sub1_tdm_train.mat');
 
     X = full(tdm_norm);
 
@@ -1234,7 +1236,7 @@ case '20NewsCompSetOf5'
       GWTopts.precision  = 1e-3; % only for leaf nodes
 
 end
-fprintf('done. (%.3f sec)',toc);
+fprintf(1,'done. (%.3f sec)\n',toc);
 
 % threshold for wavelet coefficients
 GWTopts.coeffs_threshold = 0; %GWTopts.precision/10;
